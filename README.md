@@ -1,167 +1,122 @@
-# Product Copy Quality Agent
+# E-commerce Copy Quality Inspection Agent
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [Documentation](docs/README.md)
+[English](README.md) · [简体中文](README.zh-CN.md) · [Operations guide](docs/platform-operations.md)
 
-A reproducible software engineering project for reviewing **Chinese e-commerce product copy**, with a bilingual administrator console, deterministic quality checks, retrieval of supporting rules, optional DeepSeek semantic analysis, and a MySQL-backed review workflow.
+**LLM-led e-commerce content review with rule-based safeguards and auditable publication decisions.**
 
-The repository is a portfolio/research prototype. The interface is bilingual, but submitted copy and deterministic policy checks remain Chinese-focused.
+A runnable engineering project with a bilingual administrator console, DeepSeek semantic review, database-per-tenant isolation, Redis Streams, concurrent workers, and observable review workflows. Policy checks and sample copy are primarily Chinese; changing the interface language does not translate or alter evidence.
 
-![Architecture overview](docs/assets/architecture.svg)
+![System architecture](docs/assets/architecture.svg)
 
-The project demonstrates backend architecture, database transactions, conservative LLM integration, asynchronous job execution, evaluation, and deployment. It uses a custom Python orchestrator; it does not depend on LangChain, LangGraph or model-driven tool calling, and it does not train a foundation model.
+## What the project does
 
-## Run the demo
+- Manage merchant submissions, immutable revisions, inspection reports and manual publication decisions.
+- Let the LLM inspect original copy against applicable policy first; validate every quoted evidence span and rule reference, then add deterministic safeguards the model cannot override.
+- Isolate each tenant's products, reports, jobs, sessions and evaluation outputs in a dedicated MySQL schema with its own database account.
+- Accept background jobs with HTTP 202; use Redis Streams for delivery and MySQL for durable item state, fenced leases, retry backoff and recovery.
+- Bound worker concurrency and tenant queue capacity; enforce a distributed model concurrency and request budget.
+- Export Prometheus metrics, preconfigured Grafana dashboards, Alertmanager rules and JSON runtime logs.
+- Generate 10,000+ reproducible synthetic submissions with configurable tenants, concurrency and ingress rate.
 
-Prerequisites: Docker Desktop with Docker Compose v2. Allow at least 4 GB of memory for the local stack. Run these commands in the cloned repository directory:
+This is a tested development platform, not a claim of certified compliance, perfect model accuracy or production SLO attainment. Publication changes this application's catalog status; live marketplace adapters, SSO/RBAC, provider-specific callbacks and high-availability infrastructure remain deployment work.
+
+## Start locally
+
+Requires Docker Desktop / Docker Compose v2. Reserve roughly 6 GB RAM if enabling the optional monitoring stack.
 
 ```bash
 test -f .env || cp .env.example .env
+mkdir -p .local/runtime
 docker compose up --build -d --wait
 docker compose ps
-curl http://127.0.0.1:8000/health
 ```
 
-If `.env` already exists, keep the existing file. For the local demonstration, open:
-
-| Entry point | URL / credentials |
+| Entry | Address / local default |
 |---|---|
-| Administrator console | <http://127.0.0.1:8000/admin> |
-| Product inspection workbench | <http://127.0.0.1:8000/> |
-| API reference | <http://127.0.0.1:8000/docs> |
-| Local demo account | `admin` / `admin12345` |
-| MySQL Workbench | `127.0.0.1:3307`; database/user/password: `quality_agent` |
+| Admin console | http://127.0.0.1:8000/admin |
+| Inspection workbench | http://127.0.0.1:8000/ |
+| API reference | http://127.0.0.1:8000/docs |
+| Demo login | Tenant `default`, username `admin`, password `admin12345` |
+| MySQL | Host port `3307`, container port `3306` |
+| Redis | Host port `6380`, container port `6379` |
 
-The application, MySQL and Elasticsearch ports bind to localhost. The MySQL container uses port 3306 internally. Credentials above are development defaults; configure your own before sharing a deployment. Do not commit `.env`.
+Use real credentials before sharing a deployment. Add `DEEPSEEK_API_KEY` and your available `DEEPSEEK_MODEL` to the ignored local `.env`; no model key is distributed with this repository. Full mode is the default in the admin UI. Without a model, full mode produces an explicitly degraded report that cannot authorize publication. Explicit rules mode remains available for offline baselines and inexpensive load tests; it never means a model reviewed the product.
 
-Startup creates missing tables, applies the supported column upgrades and seeds missing demo records. The default Compose stack starts MySQL, Elasticsearch, the API and a separate worker. It waits for Elasticsearch health even though runtime retrieval supports a fallback. Stop it with `docker compose down`; named volumes preserve the database and evaluation reports. Avoid `down -v` when you want to keep this data.
+All `/api/` data routes now require a tenant session; mutating requests also require its CSRF token. Log in through the admin page before using the workbench. Anonymous access to old task IDs is intentionally no longer supported.
 
-Choose **English** in the language selector. The preference persists between the console and workbench and across refreshes. Interface labels, status messages and the supplied rule explanations are localized. Product copy, quoted evidence, custom rule text, reviewer notes and downloaded source reports retain their original language. Switching the interface does not translate submitted copy or change the detector's supported language.
+## Try the workflow
 
-No API key is required for rule inspection, local retrieval, sample generation or the administrator workflow.
+1. Log in and choose Chinese or English.
+2. Generate a small synthetic preview, or create a product with title, description, category and attributes.
+3. Select products and submit batch inspection. The browser polls a durable job while independent items run concurrently.
+4. Review source evidence, policy references, risk, warnings and the execution trace.
+5. Edit and reinspect if needed. Review eligible current reports, enter a review note and publish.
+6. Inspect revision and audit history. Stale, high-risk or incomplete reports are blocked; model failure cannot silently become a full-mode pass.
 
-## Suggested reviewer walkthrough
+The Agent is a custom Python State / Skill / Tool orchestrator, with explicit dependencies and validated output. It does not use LangChain, LangGraph, autonomous tool selection or foundation-model training.
 
-1. Sign in, choose English, and inspect the existing catalog and version histories.
-2. Open **Simulate data**. Choose a seed, a batch identifier and a scenario. Preview generated records before delivering them to the catalog.
-3. Deliver the batch with rule inspection enabled. The worker processes a durable MySQL job; refresh the job status to see per-product progress. Newly delivered products are pending review.
-4. Open a product report: inspect the issue type, source evidence, applicable rule, score and execution trace.
-5. Edit a product. Saving creates a new revision and invalidates the earlier inspection. Run inspection again before attempting publication.
-6. Review a complete report and publish an eligible product with a review note. High-risk, stale or incomplete reports cannot authorize publication. Publication changes this application's catalog status only.
+## Multi-tenant operation
 
-For batch publication, select up to 20 products and choose **Review and publish batch**, or **Continue to publication review** after batch inspection. The preview shows eligible and blocked products with their current reports. Passed products are preselected; low- and medium-risk products require manual selection after reviewing their issues. Enter a review note and confirm before publishing. Each item uses an independent transaction, rechecks its version, status and report under a row lock, and records an audit entry. Results distinguish published, failed and unsubmitted products. After an interrupted response, check status again before retrying; publication is not an automatically retried background job.
+An operator provisions a tenant using `python -m scripts.provision_tenant <slug>`, with `MYSQL_ADMIN_URL` and `TENANT_ADMIN_PASSWORD` provided securely in the environment. This creates a dedicated schema and database user, hashes the administrator password and registers the connection in ignored local runtime configuration. API and worker containers receive no MySQL root credential.
 
-## Architecture
+Log in using the tenant slug. The cookie prefix chooses a registered database but grants no authority: its random bearer token must exist and be unexpired in that database. Caller-supplied tenant headers and URLs cannot override an authenticated database binding. See the [provisioning and upgrade instructions](docs/platform-operations.md).
 
-```text
-Bilingual browser UI (plain HTML / CSS / JavaScript)
-    → FastAPI: input validation, administrator session + CSRF
-    → Catalog service: product revisions, review decisions, audit records
-    → MySQL inspection jobs → separate worker
-    → Python Agent: category → rule retrieval → checks → score → safe rewrite → report
-        ├─ Deterministic Python tools and category skills
-        ├─ Elasticsearch keyword search; MySQL / bundled JSON fallback
-        └─ Optional DeepSeek category / semantic analysis
-    → MySQL: input, report, trace and catalog inspection association
-```
+## Generate 10,000+ products
 
-The interactive single-product endpoint and legacy small-batch endpoint remain synchronous HTTP operations. The `/api/admin/jobs` endpoints provide durable background execution. The worker uses leases, heartbeat renewal, bounded retry attempts and catalog version checks. The stack is intended for a single-machine demonstration, not an independently benchmarked high-availability service.
-
-| Layer | Implementation |
-|---|---|
-| API and schemas | FastAPI, Pydantic |
-| Persistence | MySQL 8, SQLAlchemy, PyMySQL |
-| Retrieval | Elasticsearch 8.17, keyword search with category filtering |
-| Agent | Custom Python state and Skill/Tool orchestration |
-| Optional model | DeepSeek chat completions, strict structured output validation |
-| UI | Plain JavaScript and explicit Chinese/English message dictionaries |
-| Deployment and testing | Docker Compose, pytest, Node.js language-layer tests |
-
-## Data sources and simulation
-
-This repository does **not** contain scraped merchant data or a live marketplace feed. Its supplied data is synthetic:
-
-- `data/samples/products.json`: 30 manually authored product examples.
-- `data/evaluation/cases.json`: 50 fixed evaluation examples, including the original 30 and 20 additional cases. Expected labels were authored for the project; they have not been independently validated by domain experts.
-- `scripts/seed_catalog.py`: imports 12 products from the sample set for the initial management demo.
-- `services/simulation.py`: produces configurable, deterministic batches for exercising the submission and inspection workflow. Scenarios include clean descriptions, unsupported claims, missing attributes and contradictions. Scenario names describe how inputs were constructed; they are **not** asserted inspection outcomes or evaluation gold.
-
-Generated products carry a `_simulation` attribute recording provenance, generator version, seed, batch and scenario. Delivery uses the catalog service and preserves version/audit records. Repeating the same batch reuses matching records; a conflicting or edited record is rejected instead of being overwritten. Optional delivery to the inspection queue performs real rule checks; the generator never invents reports or publishes products automatically.
-
-Generate a reproducible JSON preview without the database or a model:
+Offline export needs neither MySQL nor a model:
 
 ```bash
-docker compose exec -T api python -m scripts.simulate_ingestion --count 30 --seed 42 --batch-id demo-42 --scenario mixed
+python -m scripts.generate_load --count 12000 --tenants default,merchant-east,merchant-west \
+  --delivery export --output simulation-output/load.jsonl
 ```
 
-Use the administrator's **Simulate data** dialog to preview and submit a batch, or consult the [simulation guide](docs/data-simulation.md) and CLI `--help` for authenticated API delivery. Generated traffic is a functional simulation, not a production load benchmark. It does not update the fixed evaluation labels.
-
-## Example input and output
+For registered tenants, an operator can import through the same versioned catalog service:
 
 ```bash
-curl -s 'http://127.0.0.1:8000/api/products/inspect?mode=rules' \
-  -H 'Content-Type: application/json' \
-  --data-binary @data/samples/demo_food.json
+python -m scripts.generate_load --count 12000 --tenants default,merchant-east,merchant-west \
+  --delivery database --concurrency 4 --requests-per-second 4 --batch-id scale-demo
 ```
 
-Inputs contain `product_id`, `category`, `title`, `description` and `attributes`. API category values remain `食品` (food), `美妆` (beauty), and `3C` (electronics), independent of the interface language. The report includes `task_id`, status, risk level, issues, evidence, rule references, conservative copy suggestions, warnings, model-use flags and rule-source metadata. Use the returned `task_id` to retrieve its report and trace; administrator-originated reports require authentication.
+Use `--delivery api --clients-file .local/load-clients.json` to exercise authenticated HTTP ingress. Add `--inspect` to enqueue a rules-only baseline. Each delivery request stays at or below 100 products; the CLI bounds concurrent requests and backs off on HTTP 429. Same seed/batch/chunk plan safely resumes unchanged products; changing the plan requires a new batch ID.
 
-## Database responsibilities
+The generator marks provenance and scenarios, never fabricates reports, overwrites edited products, publishes automatically or changes the fixed evaluation labels. The 50 authored evaluation cases are separate from generated load and are not independently expert-validated.
 
-| Tables | Purpose |
-|---|---|
-| `product_samples`, `evaluation_cases` | Fixed sample inputs, authored expected labels, evaluation predictions and metrics |
-| `quality_rules` | Authoritative rule text, examples, status and version |
-| `inspection_tasks`, `inspection_results`, `agent_traces` | Full submitted input snapshots and hashes, execution tasks, persisted reports and trace steps |
-| `managed_products`, `product_revisions` | Current catalog content and immutable historical input revisions |
-| `product_inspections`, `product_audits` | Version-associated inspection snapshots and reviewer actions |
-| `inspection_jobs`, `inspection_job_items` | Durable batches, idempotency hashes, leases, progress and retries |
-| `admin_sessions` | Hashed administrator session tokens and expiry |
-
-Normal startup fills missing demo rules without overwriting existing MySQL rule edits. Explicit fixture import (`python -m scripts.seed_data`) can overwrite matching fixture rule IDs. Run `python -m scripts.index_rules` after intentional rule updates to build a versioned Elasticsearch index and switch its alias. Rule text provides evidence and semantic guidance; adding a rule record does not automatically implement a new deterministic Python check.
-
-## Optional LLM configuration
-
-Set the following in your local `.env`, then recreate both application processes:
-
-```dotenv
-DEEPSEEK_API_KEY=your_key_here
-DEEPSEEK_MODEL=deepseek-chat
-```
+## Monitor
 
 ```bash
-docker compose up -d --force-recreate api worker
+docker compose -f compose.yaml -f compose.monitoring.yaml up -d --build
 ```
 
-Use full mode for semantic analysis. If the model is unavailable or returns invalid JSON or unsupported citations, the system retains rule findings and marks coverage as limited. A full-mode result without successful model use is not evidence of LLM quality. Copy and summary echo-generation calls are disabled by default; deterministic suggestions avoid introducing unsupported product facts.
+- Grafana: http://127.0.0.1:3000 — local `admin / local-grafana-change-me`; configure `GRAFANA_ADMIN_PASSWORD`.
+- Prometheus: http://127.0.0.1:9090
+- Alertmanager: http://127.0.0.1:9093
+- Metrics: API `/metrics`, worker port `9101` on the internal Docker network.
 
-Local Elasticsearch keyword retrieval does not require an embedding API or an API key. Vector embeddings, reranking and English-language policy enforcement have not been implemented.
+Alerts initially deliver to a local JSON log receiver, not an email or paging service. [SLO definitions and runbooks](docs/slo.md) explain denominators, windows, exclusions and limits.
 
-## Validation
-
-Use Python 3.12 and Node.js 22 or newer for the documented development setup. Create a virtual environment and install the test dependencies:
+## Verify
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt
-RUN_MYSQL_TESTS=0 .venv/bin/pytest -q
+python -m pip install -r requirements-dev.txt
+DEEPSEEK_API_KEY='' python -m pytest -q
 npm ci --ignore-scripts
 npm test
 ```
 
-MySQL integration tests are opt-in. Follow the [isolated MySQL test setup](docs/testing.md#mysql-integration-tests) before enabling `RUN_MYSQL_TESTS=1`. Queue tests claim jobs in their target database, so use a separate test instance with no application worker attached.
+Use a separate test MySQL database with `RUN_MYSQL_TESTS=1`. Supplying a test `MYSQL_ADMIN_URL` additionally tests independent schema provisioning and SQL privilege denial; Redis is needed for transport recovery tests. Never aim test provisioning at a production instance. CI runs MySQL, Redis, Python and browser tests without a model key.
 
-Run the fixed 50-case rule baseline without external services:
+Security and concurrency tests include cross-tenant task/report/job access, cookie-prefix forgery, simultaneous tenant reads, independent item leases, stale-owner fencing, backoff, Redis stream loss/rebuild, LLM evidence validation and publication version guards.
 
-```bash
-.venv/bin/python evaluator/run_eval.py
-```
+## Documentation and scope
 
-Evaluation distinguishes issue recall, false discoveries, risk classification and model usage. Passing engineering tests does not imply perfect detection. See the [test guide](docs/testing.md), [evaluation guide](docs/evaluation.md) and [dataset notes](data/evaluation/README.md) for reproducible commands and label limitations. No validated real-model quality result is claimed without an actual keyed model evaluation. A GitHub Actions workflow is included; its presence is not a claim that a remote CI run has passed.
+- [Platform deployment, tenancy, concurrency and secrets](docs/platform-operations.md)
+- [Metrics, alerting, SLOs and operational limits](docs/slo.md)
+- [Local validation results](docs/platform-validation.md)
+- [Simulation scenarios](docs/data-simulation.md)
+- [Existing API and database reference](docs/api_database.md)
 
-## Scope and limitations
+Each tenant owns the same 13 business tables: samples/rules/evaluation fixtures; tasks/results/traces; products/revisions/inspections/audits; sessions; jobs/items. The registry is operator configuration, not a user-controlled tenancy column.
 
-See [current scope](docs/scope.md) for implemented capabilities and exclusions. After upgrading an existing deployment, refresh any already-open pages to load the updated interface.
+Redis delivery is at least once. Business writes are guarded by SQL leases, durable execution IDs and product versions; external LLM execution is not promised exactly once. The Compose deployment is single-host and does not demonstrate failover, backups across sites or sustained production capacity.
 
-This is a portfolio/research prototype and an internal review aid. It is not legal advice or a certified compliance engine. It does not connect to marketplace listing APIs, inspect images, manage orders or provide merchant accounts and multi-role permissions. Rules and labels require expert review before operational use. The system is not claimed to support reliable inspection of English product copy simply because its UI can be displayed in English.
-
-Docker volumes preserve state across restarts; they are not backups. Back up MySQL separately before deployment upgrades. API keys and database exports should remain outside the public repository. See [configuration and operations](docs/configuration.md) for local development, credentials, backups and troubleshooting, and the [documentation index](docs/README.md) for architecture and database details.
+MIT licensed. No private databases, model keys, operator credentials or internal project plans belong in Git.

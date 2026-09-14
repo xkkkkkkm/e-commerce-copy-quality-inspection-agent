@@ -27,7 +27,7 @@ class BatchItem(BaseModel):
 class BatchInspection(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[BatchItem] = Field(min_length=1, max_length=20)
-    mode: Literal["rules", "full"] = "rules"
+    mode: Literal["rules", "full"] = "full"
 
     @model_validator(mode="after")
     def unique_items(self):
@@ -37,6 +37,7 @@ class BatchInspection(BaseModel):
 
 
 class JobRequest(BatchInspection):
+    items: list[BatchItem] = Field(min_length=1, max_length=100)
     idempotency_key: str = Field(min_length=1, max_length=200)
 
 
@@ -162,7 +163,15 @@ def action(product_id: int, action: Literal["publish", "offline", "reject", "sub
 @router.post("/jobs", status_code=202)
 def create_job(data: JobRequest, actor: str = Depends(require_admin), db: Session = Depends(get_db)):
     try: return jobs.enqueue(db, [x.model_dump() for x in data.items], data.mode, data.idempotency_key, actor)
+    except jobs.QueueFullError as exc: raise HTTPException(status_code=429, detail=str(exc), headers={"Retry-After": "30"}) from exc
     except (ValueError, LookupError) as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/jobs/{job_id}/retry")
+def retry_job(job_id: str, db: Session = Depends(get_db)):
+    try: return jobs.retry_failed(db, job_id)
+    except jobs.QueueFullError as exc: raise HTTPException(status_code=429, detail=str(exc), headers={"Retry-After": "30"}) from exc
+    except ValueError as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/jobs")

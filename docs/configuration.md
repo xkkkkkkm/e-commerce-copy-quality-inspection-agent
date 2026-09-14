@@ -1,5 +1,7 @@
 # Configuration and operations
 
+> Version 2 update: the [current platform guide](platform-operations.md) supersedes earlier single-tenant/public-API examples in this document. Current behavior uses LLM-led full-mode review, database-per-tenant isolation, authenticated data routes, Redis Streams, concurrent workers, JSON logs and [metrics/SLOs](slo.md). Historical roadmap items for these capabilities are now implemented; live marketplace integration and production HA remain future work.
+
 [Documentation index](README.md) · [中文项目说明](../README.zh-CN.md)
 
 ## Environment
@@ -36,7 +38,7 @@ Search clients support `ELASTICSEARCH_API_KEY` or `ELASTICSEARCH_USERNAME`/`ELAS
 
 ## Credentials and model changes
 
-After setting the optional DeepSeek key in `.env`, recreate both processes:
+After setting the DeepSeek key for LLM-led full mode in `.env`, recreate both processes:
 
 ```bash
 docker compose up -d --force-recreate api worker

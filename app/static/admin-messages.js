@@ -1,6 +1,7 @@
 "use strict";
 
 I18n.register({
+  "租户标识": "Tenant ID",
   "批量操作结果": "Batch results",
   "发布审核": "PUBLICATION REVIEW",
   "批量审核发布": "Review and publish batch",

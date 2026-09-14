@@ -1,5 +1,6 @@
 from app.schemas import SemanticOutput, SummaryOutput
 from skills.base import BaseSkill
+import asyncio
 
 
 class SemanticRiskSkill(BaseSkill):
@@ -11,7 +12,7 @@ class SemanticRiskSkill(BaseSkill):
 
     async def run(self, context):
         rules = context.get("rules", [])
-        output = self.model(context, "semantic", {
+        output = await asyncio.to_thread(self.model, context, "semantic", {
             "product": context["product"], "rules": rules, "known_issues": context["issues"],
             "requirements": "evidence必须为对应title或description的原文连续引用；rule_id必须来自给定规则；不重复已发现的问题。",
         }, SemanticOutput)

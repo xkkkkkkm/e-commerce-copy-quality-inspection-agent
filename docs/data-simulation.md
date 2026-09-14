@@ -1,5 +1,7 @@
 # Synthetic merchant submissions / 模拟商家商品接入
 
+> Version 2 update: the [current platform guide](platform-operations.md) supersedes earlier single-tenant/public-API examples in this document. Current behavior uses LLM-led full-mode review, database-per-tenant isolation, authenticated data routes, Redis Streams, concurrent workers, JSON logs and [metrics/SLOs](slo.md). Historical roadmap items for these capabilities are now implemented; live marketplace integration and production HA remain future work.
+
 This generator supplies reproducible **synthetic** merchant submissions for the administrator workflow. It does not scrape a marketplace, use platform credentials, impersonate real merchants, or modify the fixed evaluation fixtures/gold labels. Nine clearly labelled simulated merchants cover 食品, 美妆 and 3C.
 
 Each submission is accepted through `ProductCreate` and `services.catalog.create_product`: its initial state is `pending`, content version is 1, and the normal revision and creation audit are recorded. Delivery never generates a pass result, inspection history or publication. Optional inspection queues the existing durable worker in **rules** mode; workers produce actual results and normal publication guards continue to apply.

@@ -21,10 +21,10 @@ def seed(*, import_rules: bool = False) -> tuple[int, int]:
     """
     from sqlalchemy import select
     from db.models import EvaluationCase, ProductSample, QualityRule
-    from db.session import Base, SessionLocal, engine
+    from db.session import Base, SessionLocal, current_engine
     from evaluator.run_eval import product_payload
 
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=current_engine())
     originals = load_json("data/samples/products.json")
     evaluation = load_json("data/evaluation/cases.json")
     original_ids = {item["product_id"] for item in originals}

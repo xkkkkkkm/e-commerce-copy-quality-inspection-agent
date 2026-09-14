@@ -1,5 +1,7 @@
 # Architecture and implementation
 
+> Version 2 update: the [current platform guide](platform-operations.md) supersedes earlier single-tenant/public-API examples in this document. Current behavior uses LLM-led full-mode review, database-per-tenant isolation, authenticated data routes, Redis Streams, concurrent workers, JSON logs and [metrics/SLOs](slo.md). Historical roadmap items for these capabilities are now implemented; live marketplace integration and production HA remain future work.
+
 [Documentation index](README.md) · [中文项目说明](../README.zh-CN.md)
 
 ## Design approach
@@ -23,12 +25,13 @@ flowchart TD
   API --> C[Catalog service and admin session / CSRF]
   API --> O
   C --> Q[MySQL inspection jobs]
-  Q --> W[Separate worker]
+  Q --> B[Redis Streams]
+  B --> W[Concurrent workers with item leases]
   W --> C
   C --> O
   O --> S[General and category Skills]
   S --> T[Deterministic Tools]
-  S --> L[Optional DeepSeek JSON calls]
+  S --> L[LLM-led DeepSeek semantic review]
   O --> R[Rule retriever]
   R --> E[Elasticsearch keyword search]
   R --> M[(MySQL)]
@@ -39,7 +42,7 @@ flowchart TD
 
 ## Inspection flow
 
-Input validation → supplied/inferred category → relevant and applicable rules → general checks → category checks → optional semantic analysis → issue merging and scoring → conservative rewrite → summary and report validation → result/trace persistence.
+Input validation → supplied/inferred category → relevant and applicable rules → LLM semantic review of original copy → mandatory general and category safeguards → issue merging and scoring → conservative rewrite → summary and report validation → result/trace persistence. Explicit rules-only mode skips the model stage and is labelled accordingly.
 
 State stores the normalized product, mode, category, rules, issues, score, suggestions, warnings, errors and trace events. Each Skill receives an isolated context copy; validated outputs are merged back into State. A Tool performs one check, a Skill groups business behavior, and the Orchestrator controls order and aggregation.
 
@@ -80,4 +83,4 @@ Batch publication previews up to 20 products. Confirmed items publish in indepen
 
 ## Operational boundary
 
-There is one administrator identity with expiring database sessions, CSRF/origin checks, request size limits and bounded login throttling. There is no multi-role model, global distributed rate limiter, complete versioned migration framework, HA validation or marketplace publishing integration. The default stack is a local single-machine demo. See [scope](scope.md), [configuration](configuration.md) and [testing](testing.md).
+Each tenant has a separate database/user and one administrator identity with expiring sessions. Authentication establishes database routing before request threads start. Redis controls distributed login failure windows, model concurrency and per-HTTP-attempt rate limits. SQL admission enforces tenant pending capacity. Metrics, JSON logs, dashboards and SLO alert rules are included. There is no multi-role model, complete versioned migration framework, HA validation or marketplace publishing integration. See [platform operations](platform-operations.md) for the current deployment contracts.

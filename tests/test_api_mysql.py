@@ -9,14 +9,23 @@ pytestmark = pytest.mark.skipif(os.getenv("RUN_MYSQL_TESTS") != "1", reason="req
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     from fastapi.testclient import TestClient
     from app.main import app
     from scripts.seed_data import seed
+    from app.admin_auth import get_auth_settings
+    monkeypatch.setenv("ADMIN_USERNAME", "api-tests")
+    monkeypatch.setenv("ADMIN_PASSWORD", "api-tests-private-password")
+    get_auth_settings.cache_clear()
 
     seed()
     with TestClient(app) as api:
+        login = api.post("/api/admin/auth/login", json={"username": "api-tests", "password": "api-tests-private-password"})
+        assert login.status_code == 200
+        api.headers["X-CSRF-Token"] = login.json()["csrf_token"]
         yield api
+        api.post("/api/admin/auth/logout")
+    get_auth_settings.cache_clear()
 
 
 def body():

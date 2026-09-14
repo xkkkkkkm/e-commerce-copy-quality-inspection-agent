@@ -46,7 +46,7 @@ class ProductInspect(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_version: int = Field(ge=1, strict=True)
-    mode: Literal["rules", "full"] = "rules"
+    mode: Literal["rules", "full"] = "full"
 
 
 class PublicationCandidate(BaseModel):

@@ -74,7 +74,7 @@ docker compose exec -T api python evaluator/run_eval.py --api-url http://127.0.0
 docker compose cp api:/app/evaluator/reports ./output-evaluation
 ```
 
-The first command writes three verification tasks. The second submits all 50 cases through the single-product API, creating task/report/trace records, and additionally updates evaluation predictions. These commands intentionally write to the demo database. The workbench's separate evaluation endpoint requires administrator login and CSRF; the CLI above iterates the public single-product endpoint.
+The first command writes three verification tasks. The second submits all 50 cases through the authenticated single-product API, creating task/report/trace records, and additionally updates evaluation predictions. Both CLIs now log in using `TENANT_ID`, `ADMIN_USERNAME` and `ADMIN_PASSWORD`; use matching tenant context for any local persistence. These commands intentionally write data. See [current platform validation](platform-validation.md) for the latest tests.
 
 For manual UI checks: sign in, switch Chinese/English, simulate a batch, inspect products, edit one to invalidate its report, and preview batch publication. Verify that stale/high-risk/incomplete items are blocked, low/medium risks require review, and eligible publication records the note. Use dedicated demo products: confirmed publication changes their catalog status.
 

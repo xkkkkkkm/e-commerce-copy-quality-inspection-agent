@@ -133,7 +133,7 @@ def test_batch_publication_preview_partial_success_and_repeat_guard(admin_client
     uninspected, _ = create()
     products = [good, changed, high, uninspected]
     for product in products[:3]:
-        assert client.post(f"/api/admin/products/{product['id']}/inspect", json={"expected_version": 1}).status_code == 200
+        assert client.post(f"/api/admin/products/{product['id']}/inspect", json={"expected_version": 1, "mode": "rules"}).status_code == 200
     candidates = {"items": [{"id": p["id"], "expected_version": 1} for p in products]}
     token = client.headers.pop("X-CSRF-Token")
     assert client.post("/api/admin/products/batch-publish/preview", json=candidates).status_code == 403
@@ -175,10 +175,10 @@ def test_batch_publication_reinspection_status_and_high_risk_guards(admin_client
     good, _ = create()
     high, _ = create(description="本品治疗失眠，保证根治。")
     for p in [good, high]:
-        client.post(f"/api/admin/products/{p['id']}/inspect", json={"expected_version": 1})
+        client.post(f"/api/admin/products/{p['id']}/inspect", json={"expected_version": 1, "mode": "rules"})
     plan = client.post("/api/admin/products/batch-publish/preview", json={"items": [{"id": good["id"], "expected_version": 1}]}).json()
     body = {"items": [plan["items"][0]["snapshot"]], "reason": "已复核"}
-    client.post(f"/api/admin/products/{good['id']}/inspect", json={"expected_version": 1})
+    client.post(f"/api/admin/products/{good['id']}/inspect", json={"expected_version": 1, "mode": "rules"})
     stale = client.post("/api/admin/products/batch-publish", json=body).json()
     assert stale["failed_count"] == 1 and "报告已变化" in stale["items"][0]["error"]
     current = client.get(f"/api/admin/products/{good['id']}").json()

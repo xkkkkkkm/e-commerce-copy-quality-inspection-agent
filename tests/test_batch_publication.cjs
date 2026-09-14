@@ -44,8 +44,8 @@ async function setup(t, overrides = {}) {
       result = { items, eligible_count: items.filter(x => x.eligible).length, blocked_count: items.filter(x => !x.eligible).length };
     } else if (path === '/products/batch-publish') {
       result = { items: body.items.map(x => ({ id: x.id, ok: true, product: { ...products.find(p => p.id === x.id), status: 'published' } })), success_count: body.items.length, failed_count: 0 };
-    } else if (path === '/products/batch-inspect') {
-      result = { items: body.items.map(x => ({ id: x.id, ok: true, result: { product: products.find(p => p.id === x.id), applied: true } })), success_count: body.items.length, failed_count: 0 };
+    } else if (path === '/jobs') {
+      result = { id: 'job-test', status: 'success', items: body.items.map(x => ({ id: x.id, status: 'success', error_message: null })) };
     } else throw Error(`Unexpected request: ${path}`);
     return { ok: true, status: 200, text: async () => JSON.stringify(result) };
   };

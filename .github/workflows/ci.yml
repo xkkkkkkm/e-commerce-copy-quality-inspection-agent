@@ -12,6 +12,10 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
       mysql:
         image: mysql:8.0
         env:
@@ -32,6 +36,8 @@ jobs:
       DEEPSEEK_API_KEY: ""
       APP_ENV: local
       RUN_MYSQL_TESTS: "1"
+      MYSQL_ADMIN_URL: mysql+pymysql://root:test_root_password@127.0.0.1:3306/mysql
+      REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -55,3 +61,6 @@ jobs:
           node --check app/static/app.js
           node --check app/static/select-controls.js
       - run: docker compose config --quiet
+      - run: python -m scripts.check_secrets
+      - name: Validate alert rules
+        run: docker run --rm --entrypoint promtool -v "$PWD/ops/prometheus:/etc/prometheus:ro" -w /etc/prometheus prom/prometheus:v3.2.1 test rules alerts.test.yml

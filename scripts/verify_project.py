@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import httpx
+from scripts.api_session import authenticated_client
 
 
 def main():
@@ -13,7 +14,7 @@ def main():
     cases = json.loads((Path(__file__).parents[1] / "data/evaluation/cases.json").read_text())
     # Explicit known cases make this a repeatable workflow check, not an accuracy benchmark.
     selected = {"food_001": "high", "food_004": "medium", "3c_002": "pass"}
-    with httpx.Client(base_url=args.base_url, timeout=180) as client:
+    with authenticated_client(args.base_url, timeout=180) as client:
         health = client.get("/health")
         health.raise_for_status()
         assert health.json()["database"] == "mysql"

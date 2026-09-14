@@ -1,0 +1,12 @@
+{
+  "uid": "quality-agent", "title": "E-commerce Copy Quality · Operations", "schemaVersion": 39,
+  "version": 1, "refresh": "15s", "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {"id":1,"type":"timeseries","title":"HTTP requests / second","gridPos":{"x":0,"y":0,"w":12,"h":8},"datasource":{"uid":"prometheus"},"targets":[{"expr":"sum by (status) (rate(qa_http_requests_total[5m]))","legendFormat":"{{status}}"}]},
+    {"id":2,"type":"timeseries","title":"HTTP P95 latency (seconds)","gridPos":{"x":12,"y":0,"w":12,"h":8},"datasource":{"uid":"prometheus"},"targets":[{"expr":"histogram_quantile(0.95, sum by(le) (rate(qa_http_duration_seconds_bucket[5m])))"}]},
+    {"id":3,"type":"timeseries","title":"Durable queue items","gridPos":{"x":0,"y":8,"w":12,"h":8},"datasource":{"uid":"prometheus"},"targets":[{"expr":"max by(status) (qa_queue_items)","legendFormat":"{{status}}"}]},
+    {"id":4,"type":"timeseries","title":"Oldest pending item (seconds)","gridPos":{"x":12,"y":8,"w":12,"h":8},"datasource":{"uid":"prometheus"},"targets":[{"expr":"max(qa_queue_oldest_age_seconds)"}]},
+    {"id":5,"type":"timeseries","title":"Model calls / second","gridPos":{"x":0,"y":16,"w":12,"h":8},"datasource":{"uid":"prometheus"},"targets":[{"expr":"sum by(outcome) (rate(qa_llm_calls_total[5m]))","legendFormat":"{{outcome}}"}]},
+    {"id":6,"type":"timeseries","title":"Active inspection threads","gridPos":{"x":12,"y":16,"w":12,"h":8},"datasource":{"uid":"prometheus"},"targets":[{"expr":"sum(qa_worker_active)"}]}
+  ]
+}

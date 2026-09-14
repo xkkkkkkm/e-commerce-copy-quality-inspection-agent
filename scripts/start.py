@@ -9,22 +9,24 @@ from scripts.seed_catalog import seed_catalog
 
 
 def main():
+    from services.observability import configure_logging, event
+    configure_logging()
     samples, rules = seed()
-    print(f"MySQL ready: inserted_samples={samples}, inserted_rules={rules}", flush=True)
+    event("mysql_seed_ready", count=samples + rules)
     count = seed_catalog()
-    print(f"Catalog ready: inserted_products={count}", flush=True)
+    event("catalog_seed_ready", count=count)
     for attempt in range(10):
         try:
             count = index_rules()
-            print(f"Elasticsearch ready: {count} rules", flush=True)
+            event("elasticsearch_index_ready", count=count)
             break
         except Exception as exc:
             if attempt == 9:
-                print(f"Elasticsearch indexing unavailable ({type(exc).__name__}); API will use MySQL rules. "
-                      "Retry python -m scripts.index_rules after recovery.", flush=True)
+                event("elasticsearch_index_unavailable", error_code=type(exc).__name__)
             else:
                 time.sleep(2)
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, log_config=None, access_log=False,
+                limit_concurrency=128, timeout_keep_alive=5)
 
 
 if __name__ == "__main__":

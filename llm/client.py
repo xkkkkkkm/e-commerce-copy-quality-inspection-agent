@@ -78,7 +78,7 @@ class DeepSeekClient:
         load_dotenv()
         self._api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
         self.base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+        self.model = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
         self.timeout = bounded_float("DEEPSEEK_TIMEOUT_SECONDS", 20, 1, 60)
         self.max_retries = int(os.getenv("DEEPSEEK_MAX_RETRIES", "1"))
         if not 0 <= self.max_retries <= 2:
@@ -93,6 +93,18 @@ class DeepSeekClient:
         return bool(self._api_key)
 
     def generate_json(self, purpose: str, payload: dict[str, Any], schema: type[Model]) -> Model:
+        from llm.limits import model_slot
+        from services.observability import LLM_CALLS
+        try:
+            with model_slot():
+                result = self._generate_json(purpose, payload, schema)
+            LLM_CALLS.labels(purpose if purpose in PURPOSE_PROMPTS else "unknown", "success").inc()
+            return result
+        except Exception:
+            LLM_CALLS.labels(purpose if purpose in PURPOSE_PROMPTS else "unknown", "failure").inc()
+            raise
+
+    def _generate_json(self, purpose: str, payload: dict[str, Any], schema: type[Model]) -> Model:
         if purpose not in PURPOSE_PROMPTS:
             raise ValueError("不支持的大模型调用用途")
         if not self.enabled:
@@ -122,6 +134,8 @@ class DeepSeekClient:
                     if time.monotonic() >= deadline:
                         raise DeepSeekUnavailableError("DeepSeek 请求超过总时限，已保留规则检查结果")
                     try:
+                        from llm.limits import reserve_request
+                        reserve_request()  # Every HTTP attempt, including repair and retry.
                         response = client.post(
                             f"{self.base_url}/chat/completions", json=request_body,
                             headers={"Authorization": f"Bearer {self._api_key}"},

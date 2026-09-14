@@ -135,7 +135,7 @@
     state.sessionGeneration += 1;
     state.csrf = session.csrf_token;
     state.username = session.username;
-    setText($("admin-name"), session.username);
+    setText($("admin-name"), `${session.username} · ${session.tenant || "default"}`);
     document.querySelector(".avatar").textContent = (session.username || "A").slice(0, 1).toUpperCase();
     $("login-view").hidden = true;
     $("app-view").hidden = false;
@@ -148,7 +148,7 @@
     setText($("login-submit"), t("正在登录…"));
     setError("login-error", "");
     try {
-      const session = await api("/auth/login", { method: "POST", data: { username: $("login-username").value.trim(), password: $("login-password").value }, allowUnauthorized: true });
+      const session = await api(`/auth/login?tenant=${encodeURIComponent($("login-tenant").value.trim() || "default")}`, { method: "POST", data: { username: $("login-username").value.trim(), password: $("login-password").value }, allowUnauthorized: true });
       await activateSession(session);
     } catch (error) { setError("login-error", error.message); }
     finally { $("login-submit").disabled = false; setText($("login-submit"), t("登录管理后台 →")); }
@@ -327,6 +327,7 @@
     actions.append(button(t("编辑商品"), "button secondary", () => openEditor(product.id)));
     const mode = el("select"); mode.id = "detail-mode"; setLabel(mode, "aria-label", t("商品质检模式"));
     for (const [value, label] of [["rules", t("规则模式")], ["full", t("完整模式")]]) { const option = el("option", "", label); option.value = value; mode.append(option); }
+    mode.value = "full";
     const inspect = button(product.status === "published" ? t("撤回并重新质检") : t("执行质检"), "button primary", () => inspectProduct(product, mode.value, inspect)); inspect.id = "detail-inspect";
     actions.append(mode, inspect);
     if (["pending", "offline"].includes(product.status)) {
@@ -545,7 +546,17 @@
     const resultsRoot = $("batch-results"); resultsRoot.hidden = false; resultsRoot.replaceChildren(el("strong", "", t("正在处理 {p0} 件商品，请稍候…", { p0: selected.length })));
     selected.forEach((item) => { const row = el("div", "batch-result-row"); row.append(el("span", "", item.title), el("span", "", t("等待批次完成"))); resultsRoot.append(row); });
     try {
-      const result = await api("/products/batch-inspect", { method: "POST", data: { items: selected.map(({ id, expected_version }) => ({ id, expected_version })), mode }, timeout: 600000 });
+      let job = await api("/jobs", { method: "POST", data: { items: selected.map(({ id, expected_version }) => ({ id, expected_version })), mode, idempotency_key: crypto.randomUUID() } });
+      while (["queued", "running"].includes(job.status)) {
+        if (generation !== state.sessionGeneration || !state.csrf) return;
+        const finished = job.items.filter((item) => ["success", "failed", "cancelled"].includes(item.status)).length;
+        resultsRoot.firstChild.textContent = `${t("批量质检")} · ${finished}/${job.items.length} · ${job.id.slice(-8)}`;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        job = await api(`/jobs/${encodeURIComponent(job.id)}`);
+      }
+      const result = { items: job.items.map((item) => ({ ...item, ok: item.status === "success", error: item.error_message })) };
+      result.success_count = result.items.filter((item) => item.ok).length;
+      result.failed_count = result.items.length - result.success_count;
       if (generation !== state.sessionGeneration || !state.csrf) return;
       resultsRoot.replaceChildren(el("strong", "", t("批量质检完成：成功 {p0} 件，失败 {p1} 件", { p0: result.success_count, p1: result.failed_count })));
       const rows = el("div", "batch-result-list"); resultsRoot.append(rows);
@@ -883,6 +894,14 @@
     setSimulationBusy(false);
   });
 
+  const tenantLabel = el("label", "", t("租户标识")); tenantLabel.htmlFor = "login-tenant";
+  tenantLabel.setAttribute("data-i18n", "租户标识");
+  const tenantInput = el("input"); tenantInput.id = "login-tenant"; tenantInput.name = "tenant";
+  tenantInput.value = "default"; tenantInput.maxLength = 32; tenantInput.required = true;
+  tenantInput.autocomplete = "organization"; tenantInput.pattern = "[a-z][a-z0-9-]{0,31}";
+  const usernameLabel = document.querySelector('label[for="login-username"]');
+  usernameLabel.before(tenantLabel, tenantInput);
+  $("batch-mode").value = "full";
   $("login-form").addEventListener("submit", login);
   $("logout").addEventListener("click", logout);
   $("create-product").addEventListener("click", () => openEditor());

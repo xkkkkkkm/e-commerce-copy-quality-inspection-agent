@@ -33,6 +33,11 @@ class RuleRetriever:
         if backend not in {"auto", "local", "mysql", "elasticsearch", "es"}:
             raise ValueError("不支持的规则检索后端")
         self.backend = backend
+        from services.tenancy import tenant_id
+        if tenant_id.get() != "default" and backend != "local":
+            # Tenant policy is private; the shared ES index contains only the
+            # default platform policy and must never override tenant rules.
+            self.backend = "mysql"
         self.http_client = http_client
         self.session_factory = session_factory
         self.rules_path = Path(rules_path)

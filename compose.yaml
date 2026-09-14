@@ -1,4 +1,24 @@
 services:
+  runtime-config:
+    build: .
+    user: "0:0"
+    command: ["python", "-m", "scripts.install_runtime_config"]
+    volumes:
+      - ./.local/runtime:/source:ro
+      - runtime_config:/runtime
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
   mysql:
     image: mysql:8.0
     environment:
@@ -50,14 +70,23 @@ services:
     build: .
     volumes:
       - evaluation_reports:/app/evaluator/reports
+      - runtime_config:/run/tenants:ro
     environment:
+      REDIS_URL: redis://redis:6379/0
+      TENANTS_FILE: /run/tenants/tenants.json
+      TENANT_DB_HOST: mysql
+      ADMIN_DISTRIBUTED_LIMITS: "true"
+      LLM_DISTRIBUTED_LIMITS: "true"
+      LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-4}
+      LLM_REQUESTS_PER_MINUTE: ${LLM_REQUESTS_PER_MINUTE:-60}
+      TENANT_MAX_PENDING_ITEMS: ${TENANT_MAX_PENDING_ITEMS:-20000}
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-quality_agent}:${MYSQL_PASSWORD:-quality_agent}@mysql:3306/${MYSQL_DATABASE:-quality_agent}?charset=utf8mb4
       ELASTICSEARCH_URL: http://elasticsearch:9200
       ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-quality_rules}
       ELASTICSEARCH_TIMEOUT_SECONDS: ${ELASTICSEARCH_TIMEOUT_SECONDS:-2}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-20}
       DEEPSEEK_MAX_RETRIES: ${DEEPSEEK_MAX_RETRIES:-1}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
@@ -70,6 +99,10 @@ services:
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     depends_on:
+      runtime-config:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
       mysql:
         condition: service_healthy
       elasticsearch:
@@ -89,14 +122,23 @@ services:
   worker:
     build: .
     command: ["python", "-m", "scripts.worker"]
+    volumes:
+      - runtime_config:/run/tenants:ro
     environment:
+      REDIS_URL: redis://redis:6379/0
+      TENANTS_FILE: /run/tenants/tenants.json
+      TENANT_DB_HOST: mysql
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      LLM_DISTRIBUTED_LIMITS: "true"
+      LLM_MAX_CONCURRENCY: ${LLM_MAX_CONCURRENCY:-4}
+      LLM_REQUESTS_PER_MINUTE: ${LLM_REQUESTS_PER_MINUTE:-60}
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-quality_agent}:${MYSQL_PASSWORD:-quality_agent}@mysql:3306/${MYSQL_DATABASE:-quality_agent}?charset=utf8mb4
       ELASTICSEARCH_URL: http://elasticsearch:9200
       ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-quality_rules}
       ELASTICSEARCH_TIMEOUT_SECONDS: ${ELASTICSEARCH_TIMEOUT_SECONDS:-2}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-20}
       DEEPSEEK_MAX_RETRIES: ${DEEPSEEK_MAX_RETRIES:-1}
     depends_on:
@@ -114,6 +156,8 @@ services:
           memory: 1G
 
 volumes:
+  runtime_config:
+  redis_data:
   mysql_data:
   es_data:
   evaluation_reports:

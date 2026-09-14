@@ -143,14 +143,17 @@ def test_api_mode_is_explicit_and_request_excludes_gold(monkeypatch):
     captured = {}
     class Context:
         def __enter__(self):
-            from io import StringIO
-            return StringIO(json.dumps(response("server_generated_task")))
+            return self
         def __exit__(self, *args):
             pass
-    def request(req, timeout):
-        captured.update(url=req.full_url, body=json.loads(req.data), method=req.get_method(), timeout=timeout)
+        def post(self, url, json):
+            import httpx
+            captured.update(url=url, body=json, method="POST")
+            return httpx.Response(200, json=response("server_generated_task"), request=httpx.Request("POST", url))
+    def request(origin, timeout):
+        captured.update(timeout=timeout)
         return Context()
-    monkeypatch.setattr("evaluator.run_eval.urlopen", request)
+    monkeypatch.setattr("scripts.api_session.authenticated_client", request)
     report = run_evaluation([fixture("api")], api_inspector("http://localhost:8000", "rules", 3))
     assert captured["url"] == "http://localhost:8000/api/products/inspect?mode=rules"
     assert captured["method"] == "POST"

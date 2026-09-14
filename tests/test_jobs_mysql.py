@@ -75,7 +75,7 @@ def test_idempotency_and_payload_mismatch(queue_store):
                      items=[{"id": queue_store[1], "expected_version": 1}])
 
 
-def test_one_item_per_job_and_success(queue_store):
+def test_items_in_one_job_run_concurrently_and_finish_independently(queue_store):
     from services import jobs
     from db.job_models import InspectionJob, InspectionJobItem
     with _session() as db:
@@ -84,11 +84,11 @@ def test_one_item_per_job_and_success(queue_store):
                            items=[{"id": queue_store[0], "expected_version": 1},
                                   {"id": queue_store[1], "expected_version": 1}])
         first = jobs.claim(db, "worker-a", lease_seconds=60)
-        assert first and jobs.claim(db, "worker-b", lease_seconds=60) is None
+        second = jobs.claim(db, "worker-b", lease_seconds=60)
+        assert first and second and second != first
         item = db.get(InspectionJobItem, first)
         assert jobs.finish_item(db, first, ok=True, owner="worker-a", task_id=item.task_id)
-        second = jobs.claim(db, "worker-b", lease_seconds=60)
-        assert second and second != first
+        assert db.get(InspectionJob, created["id"]).status == "running"
         assert jobs.finish_item(db, second, ok=True, owner="worker-b")
         job = db.get(InspectionJob, created["id"])
         assert job.status == "success"
@@ -116,7 +116,7 @@ def test_concurrent_workers_cannot_claim_same_job(queue_store):
     with ThreadPoolExecutor(max_workers=2) as pool:
         claimed = list(pool.map(claim_for, ("concurrent-a", "concurrent-b")))
     ids = [item_id for _, item_id in claimed if item_id is not None]
-    assert len(ids) == 1
+    assert len(ids) == 2 and len(set(ids)) == 2
 
 
 def test_expired_lease_recovery_and_fencing(queue_store):
@@ -125,12 +125,14 @@ def test_expired_lease_recovery_and_fencing(queue_store):
     with _session() as db:
         created = _enqueue(db, queue_store, key="lease-" + uuid4().hex)
         item_id = jobs.claim(db, "old-worker", lease_seconds=60)
-        db.execute(update(InspectionJob).where(InspectionJob.id == created["id"]).values(
+        db.execute(update(InspectionJobItem).where(InspectionJobItem.id == item_id).values(
             lease_until=jobs._now().replace(year=2000)))
         db.commit()
         assert jobs.recover_expired(db) == 1
         item = db.get(InspectionJobItem, item_id)
         assert item.status == "retry"
+        item.next_attempt_at = jobs._now().replace(year=2000)
+        db.commit()
         new_id = jobs.claim(db, "new-worker", lease_seconds=60)
         assert new_id == item_id
         assert jobs.finish_item(db, item_id, ok=True, owner="old-worker") is False
@@ -147,7 +149,7 @@ def test_cancelled_running_job_expires_to_terminal_cancelled(queue_store):
         assert item_id
         state = jobs.cancel(db, created["id"])
         assert state["status"] == "running"
-        db.execute(update(InspectionJob).where(InspectionJob.id == created["id"]).values(
+        db.execute(update(InspectionJobItem).where(InspectionJobItem.id == item_id).values(
             lease_until=jobs._now().replace(year=2000)))
         db.commit()
         assert jobs.recover_expired(db) == 1
@@ -168,10 +170,12 @@ def test_task_id_survives_lease_recovery_and_reclaim(queue_store):
         item_id = jobs.claim(db, "worker-a", lease_seconds=60)
         original = db.get(InspectionJobItem, item_id).task_id
         assert original
-        db.execute(update(InspectionJob).where(InspectionJob.id == created["id"])
+        db.execute(update(InspectionJobItem).where(InspectionJobItem.id == item_id)
                    .values(lease_until=jobs._now().replace(year=2000)))
         db.commit()
         assert jobs.recover_expired(db) == 1
+        db.get(InspectionJobItem, item_id).next_attempt_at = jobs._now().replace(year=2000)
+        db.commit()
         assert jobs.claim(db, "worker-b", lease_seconds=60) == item_id
         assert db.get(InspectionJobItem, item_id).task_id == original
 
@@ -220,6 +224,46 @@ def test_bounded_failures(queue_store):
             item = db.get(InspectionJobItem, item_id)
             if attempt < jobs.MAX_ATTEMPTS:
                 assert item.status == "retry"
+                assert jobs.claim(db, "worker", lease_seconds=60) is None  # backoff enforced
+                item.next_attempt_at = jobs._now().replace(year=2000)
+                db.commit()
                 assert jobs.claim(db, "worker", lease_seconds=60) == item_id
             else:
                 assert item.status == "failed"
+
+
+def test_last_completion_uses_current_read_after_waiting_peer_commit(queue_store):
+    from db.job_models import InspectionJob, InspectionJobItem
+    from services import jobs
+    with _session() as db:
+        job = _enqueue(db, queue_store, key="close-race-" + uuid4().hex,
+                       items=[{"id": queue_store[0], "expected_version": 1},
+                              {"id": queue_store[1], "expected_version": 1}])
+        first = jobs.claim(db, "a")
+        second = jobs.claim(db, "b")
+    with _session() as stale_snapshot, _session() as peer:
+        stale_snapshot.get(InspectionJobItem, first)  # Establish old RR snapshot.
+        assert jobs.finish_item(peer, first, ok=True, owner="a")
+        assert jobs.finish_item(stale_snapshot, second, ok=True, owner="b")
+    with _session() as check:
+        assert check.get(InspectionJob, job["id"]).status == "success"
+
+
+def test_tenant_queue_capacity_serializes_concurrent_admission(queue_store, monkeypatch):
+    from services import jobs
+    from db.job_models import InspectionJobItem
+    from sqlalchemy import func
+    with _session() as db:
+        baseline = db.scalar(select(func.count()).select_from(InspectionJobItem).where(
+            InspectionJobItem.status.in_(["queued", "running", "retry"])))
+    monkeypatch.setenv("TENANT_MAX_PENDING_ITEMS", str(baseline + 1))
+    def admit(index):
+        with _session() as db:
+            try:
+                _enqueue(db, queue_store, key="capacity-" + uuid4().hex,
+                         items=[{"id": queue_store[index], "expected_version": 1}])
+                return "accepted"
+            except jobs.QueueFullError:
+                return "full"
+    with ThreadPoolExecutor(2) as pool:
+        assert sorted(pool.map(admit, [0, 1])) == ["accepted", "full"]

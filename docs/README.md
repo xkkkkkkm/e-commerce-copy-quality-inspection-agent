@@ -4,6 +4,8 @@ This index is the stable entry point for project reviewers. The root [README](..
 
 ## Start here
 
+Version 2: begin with [platform operations](platform-operations.md), [SLO and monitoring](slo.md) and [validation results](platform-validation.md). These cover the current multi-tenant, authenticated, Redis-backed architecture and supersede older single-tenant examples below.
+
 1. [Current scope and limitations](scope.md)
 2. [Architecture and implementation](architecture.md)
 3. [API and database](api_database.md)

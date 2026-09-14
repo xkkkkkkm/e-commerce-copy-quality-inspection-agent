@@ -222,6 +222,9 @@ def deliver_batch(db, request: DeliveryRequest | dict, actor: str) -> dict:
         key = "simulation:" + _digest({"seed": request.seed, "batch_id": request.batch_id})
         try:
             job_id = jobs.enqueue(db, items, "rules", key, actor)["id"]
+        except jobs.QueueFullError as exc:
+            db.rollback()
+            raise catalog.CatalogError(429, "Tenant queue capacity reached; retry the same batch later") from exc
         except ValueError as exc:
             db.rollback()
             raise catalog.CatalogError(409, "模拟批次质检任务参数冲突，请使用新的 batch_id。") from exc

@@ -1,0 +1,49 @@
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'qa_http_requests_total{route="/api/admin/products",status="500"}'
+        values: '0+5x70'
+      - series: 'qa_http_requests_total{route="/api/admin/products",status="200"}'
+        values: '0+95x70'
+      - series: 'qa_job_end_to_end_seconds_count{mode="rules",outcome="failed"}'
+        values: '0+1x70'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ApiErrorBudgetFastBurn
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations: {summary: "API 99.9% availability budget burns over 14.4x in both windows"}
+      - eval_time: 15m
+        alertname: InspectionCompletionSloBurn
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations: {summary: "Over 5% of terminal inspections fail or exceed five minutes"}
+  - interval: 1m
+    input_series:
+      - series: 'qa_job_end_to_end_seconds_count{mode="rules",outcome="success"}'
+        values: '100+0x70'
+      - series: 'qa_job_end_to_end_seconds_bucket{mode="rules",outcome="success",le="300.0"}'
+        values: '100+0x70'
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: InspectionCompletionSloBurn
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'up{job="worker",instance="worker:9101"}'
+        values: '0 0 0 0'
+      - series: 'qa_queue_oldest_age_seconds'
+        values: '400+60x10'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {job: worker, instance: "worker:9101", severity: critical}
+            exp_annotations: {summary: "API or worker metrics endpoint is unavailable"}
+      - eval_time: 6m
+        alertname: QueueAgeExceeded
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations: {summary: "Queue work is older than the five-minute target"}

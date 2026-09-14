@@ -33,7 +33,7 @@ def deliver_via_api(request: SimulationRequest, base_url: str, enqueue_inspectio
         raise RuntimeError("Set ADMIN_USERNAME and ADMIN_PASSWORD in the environment or project .env before --deliver.")
     # Never follow a redirect that could forward administrator credentials.
     with httpx.Client(base_url=base_url, timeout=120, follow_redirects=False) as client:
-        response = client.post("/api/admin/auth/login", json={"username": username, "password": password})
+        response = client.post("/api/admin/auth/login", params={"tenant": os.getenv("TENANT_ID", "default")}, json={"username": username, "password": password})
         if response.status_code != 200:
             raise RuntimeError(f"Administrator login failed (HTTP {response.status_code}).")
         client.headers["X-CSRF-Token"] = response.json()["csrf_token"]

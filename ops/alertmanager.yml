@@ -1,0 +1,11 @@
+route:
+  receiver: local-json-log
+  group_by: [alertname, job]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+receivers:
+  - name: local-json-log
+    webhook_configs:
+      - url: http://alert-receiver:9102/alerts
+        send_resolved: true

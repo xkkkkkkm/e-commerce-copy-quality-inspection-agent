@@ -1,11 +1,14 @@
 """Durable administrator inspection queue."""
 from base64 import urlsafe_b64decode, urlsafe_b64encode
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import json
+import os
+import random
 from hashlib import sha256
 from uuid import uuid4
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,8 +19,42 @@ MAX_ATTEMPTS = 3
 LEASE_SECONDS = 300
 
 
+class QueueFullError(ValueError):
+    pass
+
+
+@contextmanager
+def _admission(db):
+    from sqlalchemy import text
+    # Release any authentication/read connection before obtaining the separate
+    # advisory-lock connection, avoiding pool starvation under concurrent ingress.
+    db.rollback()
+    with db.get_bind().connect() as connection:
+        name = "qa_admission_" + sha256(str(connection.engine.url.database).encode()).hexdigest()[:32]
+        if connection.scalar(text("SELECT GET_LOCK(:name, 5)"), {"name": name}) != 1:
+            raise QueueFullError("Queue admission busy; retry later")
+        try:
+            yield
+        finally:
+            connection.execute(text("SELECT RELEASE_LOCK(:name)"), {"name": name})
+
+
+def _check_capacity(db, count):
+    active = db.scalar(select(func.count()).select_from(InspectionJobItem).where(
+        InspectionJobItem.status.in_(["queued", "running", "retry"])))
+    if active + count > int(os.getenv("TENANT_MAX_PENDING_ITEMS", "20000")):
+        raise QueueFullError("Tenant queue capacity reached; retry later")
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _observe_terminal(item):
+    if item.status in {"success", "failed"}:
+        from services.observability import JOB_ITEMS, JOB_LATENCY
+        JOB_ITEMS.labels(item.status, item.mode).inc()
+        JOB_LATENCY.labels(item.mode, item.status).observe(max(0, (_now() - item.created_at).total_seconds()))
 
 
 def _job_id(key: str) -> str:
@@ -49,6 +86,19 @@ def enqueue(db: Session, items: list[dict], mode: str, idempotency_key: str, act
         if existing.payload_hash != payload_hash:
             raise ValueError("idempotency_key already used with a different payload")
         return serialize_job(db, existing)
+    # Serialize admission per tenant database, across API replicas. MySQL
+    # advisory lock is released immediately after the durable enqueue commit.
+    with _admission(db):
+        existing = db.get(InspectionJob, jid)
+        if existing:
+            if existing.payload_hash != payload_hash:
+                raise ValueError("idempotency_key already used with a different payload")
+            return serialize_job(db, existing)
+        _check_capacity(db, len(items))
+        return _enqueue_locked(db, items, mode, key, actor, jid, payload_hash, ids)
+
+
+def _enqueue_locked(db, items, mode, key, actor, jid, payload_hash, ids):
     product_ids = set(db.scalars(select(ManagedProduct.id).where(ManagedProduct.id.in_(ids))).all())
     if product_ids != set(ids):
         raise LookupError("商品不存在")
@@ -116,20 +166,20 @@ def list_jobs(db: Session, limit=20, before: str | None = None):
 
 
 def _lock_job(db: Session, job_id: str) -> InspectionJob | None:
-    return db.scalar(select(InspectionJob).where(InspectionJob.id == job_id).with_for_update())
+    return db.scalar(select(InspectionJob).where(InspectionJob.id == job_id).with_for_update()
+                     .execution_options(populate_existing=True))
 
 
 def _close_if_done(db: Session, job: InspectionJob, now: datetime | None = None) -> None:
     now = now or _now()
-    active = db.scalar(select(InspectionJobItem.id).where(
-        InspectionJobItem.job_id == job.id,
-        InspectionJobItem.status.in_(["queued", "running", "retry"])))
-    if active:
+    # Must be a current read: a worker may have opened a REPEATABLE READ
+    # snapshot before waiting for the peer's job lock during finish_item.
+    statuses = db.scalars(select(InspectionJobItem.status).where(
+        InspectionJobItem.job_id == job.id).with_for_update()).all()
+    if any(status in {"queued", "running", "retry"} for status in statuses):
         return
-    failed = db.scalar(select(InspectionJobItem.id).where(
-        InspectionJobItem.job_id == job.id, InspectionJobItem.status == "failed"))
-    cancelled = db.scalar(select(InspectionJobItem.id).where(
-        InspectionJobItem.job_id == job.id, InspectionJobItem.status == "cancelled"))
+    failed = "failed" in statuses
+    cancelled = "cancelled" in statuses
     job.status = "cancelled" if job.cancel_requested or cancelled else ("failed" if failed else "success")
     job.finished_at = job.finished_at or now
     job.lease_owner = None
@@ -150,21 +200,25 @@ def cancel(db: Session, job_id: str) -> dict:
     return serialize_job(db, job)
 
 
-def claim(db: Session, owner: str, lease_seconds: int = LEASE_SECONDS):
-    """Claim one item; the job row lock serializes claims per job."""
+def claim(db: Session, owner: str, lease_seconds: int = LEASE_SECONDS, item_id: int | None = None):
+    """Short job->item locks; independent items hold independent fenced leases."""
     now = _now()
-    candidates = db.scalars(select(InspectionJob).where(
-        InspectionJob.status.in_(["queued", "running"]),
-        InspectionJob.cancel_requested.is_(False)).order_by(
-            InspectionJob.created_at, InspectionJob.id).with_for_update(skip_locked=True)).all()
+    stmt = select(InspectionJob).where(InspectionJob.status.in_(["queued", "running"]),
+                                       InspectionJob.cancel_requested.is_(False))
+    if item_id is not None:
+        stmt = stmt.where(InspectionJob.id == select(InspectionJobItem.job_id).where(
+            InspectionJobItem.id == item_id).scalar_subquery())
+    candidates = db.scalars(stmt.order_by(InspectionJob.created_at, InspectionJob.id)
+                           .limit(20).with_for_update(skip_locked=item_id is None)).all()
     for job in candidates:
-        if job.status == "running" and job.lease_until and job.lease_until > now:
-            continue
-        item = db.scalar(select(InspectionJobItem).where(
+        query = select(InspectionJobItem).where(
             InspectionJobItem.job_id == job.id,
             InspectionJobItem.status.in_(["queued", "retry"]),
-            InspectionJobItem.attempts < MAX_ATTEMPTS).order_by(InspectionJobItem.id)
-                         .with_for_update(skip_locked=True))
+            or_(InspectionJobItem.next_attempt_at.is_(None), InspectionJobItem.next_attempt_at <= now),
+            InspectionJobItem.attempts < MAX_ATTEMPTS)
+        if item_id is not None:
+            query = query.where(InspectionJobItem.id == item_id)
+        item = db.scalar(query.order_by(InspectionJobItem.id).limit(1).with_for_update(skip_locked=item_id is None))
         if not item:
             _close_if_done(db, job, now)
             continue
@@ -177,8 +231,8 @@ def claim(db: Session, owner: str, lease_seconds: int = LEASE_SECONDS):
         item.error_message = None
         job.status = "running"
         job.attempts += 1
-        job.lease_owner = owner
-        job.lease_until = now + timedelta(seconds=max(1, int(lease_seconds)))
+        item.lease_owner = owner
+        item.lease_until = now + timedelta(seconds=max(1, int(lease_seconds)))
         job.started_at = job.started_at or now
         db.commit()
         return item.id
@@ -193,23 +247,27 @@ def renew(db: Session, item_id: int, owner: str, lease_seconds: int = LEASE_SECO
     item = db.scalar(select(InspectionJobItem).where(InspectionJobItem.id == item_id))
     if not item:
         db.rollback(); return False
-    job = _lock_job(db, item.job_id)
-    item = db.scalar(select(InspectionJobItem).where(InspectionJobItem.id == item_id).with_for_update())
-    if not job or not item or job.lease_owner != owner or item.status != "running" or not job.lease_until or job.lease_until <= now:
+    item = db.scalar(select(InspectionJobItem).where(InspectionJobItem.id == item_id).with_for_update()
+                     .execution_options(populate_existing=True))
+    if not item or item.lease_owner != owner or item.status != "running" or not item.lease_until or item.lease_until <= now:
         db.rollback(); return False
-    job.lease_until = now + timedelta(seconds=max(1, int(lease_seconds)))
+    item.lease_until = now + timedelta(seconds=max(1, int(lease_seconds)))
     db.commit(); return True
 
 
 def recover_expired(db: Session) -> int:
     now = _now()
     candidates = db.scalars(select(InspectionJob).where(
-        InspectionJob.status == "running", InspectionJob.lease_until <= now)
-        .with_for_update(skip_locked=True)).all()
+        InspectionJob.status.in_(["running", "queued"]), InspectionJob.id.in_(
+            select(InspectionJobItem.job_id).where(InspectionJobItem.status == "running",
+                or_(InspectionJobItem.lease_until <= now, InspectionJobItem.lease_until.is_(None)))))
+        .limit(100).with_for_update(skip_locked=True)).all()
     recovered = 0
+    terminal = []
     for job in candidates:
         running = db.scalars(select(InspectionJobItem).where(
-            InspectionJobItem.job_id == job.id, InspectionJobItem.status == "running")
+            InspectionJobItem.job_id == job.id, InspectionJobItem.status == "running",
+            or_(InspectionJobItem.lease_until <= now, InspectionJobItem.lease_until.is_(None)))
             .with_for_update()).all()
         for item in running:
             if job.cancel_requested:
@@ -223,6 +281,12 @@ def recover_expired(db: Session) -> int:
             else:
                 item.status = "retry"
                 item.error_message = "执行租约过期，等待重试"
+                item.next_attempt_at = now + timedelta(seconds=2 ** item.attempts)
+            item.lease_owner = None
+            item.lease_until = None
+            item.dispatched_at = None
+            if item.status == "failed":
+                terminal.append(item)
         job.lease_owner = None
         job.lease_until = None
         job.status = "queued"
@@ -230,6 +294,8 @@ def recover_expired(db: Session) -> int:
         db.flush()
         _close_if_done(db, job, now)
     db.commit()
+    for item in terminal:
+        _observe_terminal(item)
     return recovered
 
 
@@ -241,8 +307,9 @@ def finish_item(db: Session, item_id: int, *, ok: bool, task_id=None,
     if not item:
         db.rollback(); return False
     job = _lock_job(db, item.job_id)
-    item = db.scalar(select(InspectionJobItem).where(InspectionJobItem.id == item_id).with_for_update())
-    if not job or item.status != "running" or (owner is not None and job.lease_owner != owner) or not job.lease_until or job.lease_until <= now:
+    item = db.scalar(select(InspectionJobItem).where(InspectionJobItem.id == item_id).with_for_update()
+                     .execution_options(populate_existing=True))
+    if not job or item.status != "running" or (owner is not None and item.lease_owner != owner) or not item.lease_until or item.lease_until <= now:
         db.rollback(); return False
     item.task_id = task_id or item.task_id
     item.inspection_id = inspection_id
@@ -250,10 +317,38 @@ def finish_item(db: Session, item_id: int, *, ok: bool, task_id=None,
     item.status = "success" if ok else ("retry" if item.attempts < MAX_ATTEMPTS and not job.cancel_requested else "failed")
     if item.status in {"success", "failed"}:
         item.finished_at = now
-    job.lease_owner = None
-    job.lease_until = None
+    item.lease_owner = None
+    item.lease_until = None
+    item.dispatched_at = None
+    if item.status == "retry":
+        item.next_attempt_at = now + timedelta(seconds=min(60, 2 ** item.attempts + random.random()))
+        if inspection_id is not None:
+            # An incomplete/degraded committed report is archived. The next
+            # attempt gets a new task; crash recovery of an unacknowledged
+            # attempt still retains its stable task ID until finish commits.
+            item.task_id = None
     job.status = "queued" if item.status == "retry" else "running"
     db.flush()
     _close_if_done(db, job, now)
     db.commit()
+    _observe_terminal(item)
     return True
+
+
+def retry_failed(db: Session, job_id: str):
+    """Explicit operator retry, retaining product/version guards and task IDs."""
+    with _admission(db):
+        job = _lock_job(db, job_id)
+        if not job or job.status != "failed":
+            raise ValueError("Only failed jobs can be retried")
+        items = db.scalars(select(InspectionJobItem).where(
+            InspectionJobItem.job_id == job_id, InspectionJobItem.status == "failed").with_for_update()).all()
+        _check_capacity(db, len(items))
+        for item in items:
+            item.status, item.attempts = "queued", 0
+            item.next_attempt_at = item.dispatched_at = item.finished_at = None
+            if item.inspection_id is not None:
+                item.task_id = None
+        job.status, job.cancel_requested, job.finished_at = "queued", False, None
+        db.commit()
+        return serialize_job(db, job)

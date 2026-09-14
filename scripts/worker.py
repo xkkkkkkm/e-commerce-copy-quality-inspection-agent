@@ -1,5 +1,7 @@
 """Durable inspection worker: ``python -m scripts.worker``."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+import os
 import socket
 import threading
 import time
@@ -11,17 +13,25 @@ from db.catalog_models import ManagedProduct, ProductInspection
 from db.job_models import InspectionJob, InspectionJobItem
 from db.session import SessionLocal
 from services import catalog, jobs
+from services import broker
+from services.tenancy import tenant_scope, tenant_names, tenant_id
+from services.observability import (configure_logging, event, WORKER_ACTIVE, WORKER_HEARTBEAT,
+                                    QUEUE_ITEMS, QUEUE_AGE, TENANT_RECONCILE_FAILURES)
 
 
-def _renew_loop(item_id: int, owner: str, stop: threading.Event, interval: float) -> None:
+def _renew_loop(item_id: int, owner: str, stop: threading.Event, interval: float, tenant: str) -> None:
     while not stop.wait(interval):
-        with SessionLocal() as heartbeat_db:
-            if not jobs.renew(heartbeat_db, item_id, owner):
-                return
+        try:
+            with tenant_scope(tenant), SessionLocal() as heartbeat_db:
+                if not jobs.renew(heartbeat_db, item_id, owner):
+                    return
+        except Exception as exc:
+            event("lease_renewal_failed", tenant_id=tenant, item_id=item_id, error_code=type(exc).__name__)
+            return
 
 
-def execute_once(db, owner: str) -> bool:
-    item_id = jobs.claim(db, owner)
+def execute_once(db, owner: str, *, item_id: int | None = None) -> bool:
+    item_id = jobs.claim(db, owner, item_id=item_id)
     if item_id is None:
         return False
     item = db.get(InspectionJobItem, item_id)
@@ -56,7 +66,7 @@ def execute_once(db, owner: str) -> bool:
         return True
     stop = threading.Event()
     heartbeat = threading.Thread(target=_renew_loop,
-                                 args=(item_id, owner, stop, max(5.0, jobs.LEASE_SECONDS / 3)),
+                                 args=(item_id, owner, stop, max(5.0, jobs.LEASE_SECONDS / 3), tenant_id.get()),
                                  daemon=True)
     heartbeat.start()
     ok = False
@@ -73,7 +83,7 @@ def execute_once(db, owner: str) -> bool:
               and bool(result.get("product", {}).get("inspection_complete")))
         inspection_id = result.get("inspection", {}).get("id")
     except Exception as exc:
-        error = f"{type(exc).__name__}: {exc}"
+        error = type(exc).__name__
         db.rollback()
     finally:
         stop.set()
@@ -84,25 +94,103 @@ def execute_once(db, owner: str) -> bool:
         if inspection_id is None:
             inspection_id = finish_db.scalar(select(ProductInspection.id).where(
                 ProductInspection.task_id == task_id).order_by(ProductInspection.id.desc()))
-        jobs.finish_item(finish_db, item_id, ok=ok, task_id=task_id,
+        accepted = jobs.finish_item(finish_db, item_id, ok=ok, task_id=task_id,
                          inspection_id=inspection_id, error=error, owner=owner)
+        completed = finish_db.get(InspectionJobItem, item_id)
+        event("inspection_job_item_finished", item_id=item_id, job_id=job_id, task_id=task_id,
+              status=completed.status, error_code=error, mode=mode)
     return True
+
+
+def consume(tenant, owner):
+    with tenant_scope(tenant):
+        message = broker.receive(owner)
+        if not message:
+            return False
+        message_id, payload = message
+        with WORKER_ACTIVE.track_inprogress(), SessionLocal() as db:
+            execute_once(db, owner + ":" + uuid4().hex[:8], item_id=int(payload["item_id"]))
+        # Retry is durable in SQL; the dispatcher will send it when due.
+        broker.acknowledge(message_id)
+        return True
+
+
+def reconcile():
+    from sqlalchemy import func
+    counts = {status: 0 for status in ("queued", "running", "retry", "failed", "success", "cancelled")}
+    oldest = 0
+    failures = 0
+    for tenant in tenant_names():
+        try:
+            with tenant_scope(tenant), SessionLocal() as db:
+                jobs.recover_expired(db)
+                broker.dispatch(db)
+                for status, count in db.execute(select(InspectionJobItem.status, func.count()).group_by(InspectionJobItem.status)):
+                    counts[status] = counts.get(status, 0) + count
+                first = db.scalar(select(func.min(InspectionJobItem.created_at)).where(
+                    InspectionJobItem.status.in_(["queued", "running", "retry"])))
+                if first:
+                    oldest = max(oldest, (jobs._now() - first).total_seconds())
+        except Exception as exc:
+            failures += 1
+            event("tenant_reconciliation_failed", tenant_id=tenant, error_code=type(exc).__name__)
+            continue
+    for status, count in counts.items():
+        QUEUE_ITEMS.labels(status).set(count)
+    QUEUE_AGE.set(oldest)
+    TENANT_RECONCILE_FAILURES.set(failures)
+    if failures < len(tenant_names()):
+        WORKER_HEARTBEAT.set(time.time())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true")
-    parser.add_argument("--poll", type=float, default=1.0)
+    parser.add_argument("--poll", type=float, default=0.1)
     args = parser.parse_args()
+    configure_logging()
+    from prometheus_client import start_http_server
+    start_http_server(int(os.getenv("WORKER_METRICS_PORT", "9101")))
     owner = f"{socket.gethostname()}:{uuid4().hex[:8]}"
-    while True:
-        with SessionLocal() as db:
-            jobs.recover_expired(db)
-            did_work = execute_once(db, owner)
-        if args.once:
-            return
-        if not did_work:
-            time.sleep(max(0.05, args.poll))
+    concurrency = max(1, min(32, int(os.getenv("WORKER_CONCURRENCY", "4"))))
+    with ThreadPoolExecutor(max_workers=concurrency) as pool, ThreadPoolExecutor(max_workers=1) as reconciler:
+        pending = set()
+        cursor = 0
+        last_reconcile = 0
+        reconciliation = None
+        while True:
+            try:
+                for future in tuple(pending):
+                    if future.done():
+                        pending.remove(future)
+                        try:
+                            future.result()
+                        except Exception as exc:
+                            event("worker_item_failed", error_code=type(exc).__name__)
+                if time.monotonic() - last_reconcile > 2 and (reconciliation is None or reconciliation.done()):
+                    last_reconcile = time.monotonic()
+                    if reconciliation:
+                        try:
+                            reconciliation.result()
+                        except Exception as exc:
+                            event("worker_reconciliation_failed", error_code=type(exc).__name__)
+                    reconciliation = reconciler.submit(reconcile)
+                    if args.once:
+                        reconciliation.result()
+                names = tenant_names()
+                while len(pending) < concurrency:
+                    # Round-robin scheduling avoids a large tenant monopolizing
+                    # all slots. Each task owns its SQL session and tenant scope.
+                    tenant = names[cursor % len(names)]
+                    cursor += 1
+                    pending.add(pool.submit(consume, tenant, owner))
+                if args.once:
+                    for future in pending:
+                        future.result()
+                    return
+            except Exception as exc:
+                event("worker_iteration_failed", error_code=type(exc).__name__)
+            time.sleep(max(.05, min(args.poll, 1)))
 
 
 if __name__ == "__main__":

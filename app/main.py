@@ -25,6 +25,10 @@ from app.simulation import router as simulation_router
 from app.admin_auth import require_admin, router as admin_auth_router
 from db import auth_models, catalog_models  # noqa: F401: register new tables
 from db import job_models  # noqa: F401: register durable inspection queue tables
+from app.tenant_middleware import TenantMiddleware
+from app.body_limit import BodyLimitMiddleware
+from services.tenancy import evaluation_path
+from services.observability import (ObservabilityMiddleware, INSPECTIONS, INSPECTION_SECONDS, event)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,12 +37,17 @@ EVALUATION_LOCK = Lock()
 
 @asynccontextmanager
 async def lifespan(app):
-    run_migrations()
-    Base.metadata.create_all(bind=engine)
+    from services.tenancy import tenant_names, tenant_scope
+    from db.session import current_engine
+    for name in tenant_names():
+        with tenant_scope(name):
+            bind = current_engine()
+            run_migrations(bind)
+            Base.metadata.create_all(bind=bind)
     yield
 
 
-app = FastAPI(title="电商商品文案质检 Agent", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="E-commerce Copy Quality Inspection Agent", version="2.0.0", lifespan=lifespan)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -72,6 +81,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(TenantMiddleware)
+app.add_middleware(BodyLimitMiddleware)
+app.add_middleware(ObservabilityMiddleware)
 app.mount("/static", StaticFiles(directory=ROOT / "app/static"), name="static")
 app.include_router(admin_auth_router)
 app.include_router(admin_router)
@@ -115,7 +127,10 @@ def perform_inspection(product: ProductInput, db: Session, mode: str, trigger_so
         raise RuntimeError("质检任务不存在")
     if task_id and task.product_id != product.product_id:
         raise RuntimeError("质检任务与商品不匹配")
+    db.commit()  # No SQL transaction/connection held during external model I/O.
     traces = []
+    import time
+    started = time.monotonic()
     try:
         retriever = RuleRetriever()
         report = inspect_product(product, task.task_id, lambda **event: traces.append(event),
@@ -123,8 +138,11 @@ def perform_inspection(product: ProductInput, db: Session, mode: str, trigger_so
         report.rule_version = retriever.last_version
         report.rule_source = retriever.last_source
         save_success(db, task, report, traces)
+        INSPECTIONS.labels(mode, "degraded" if report.degraded else report.status).inc()
+        event("inspection_completed", task_id=task.task_id, mode=mode, status=report.status)
         return report
     except Exception as exc:
+        INSPECTIONS.labels(mode, "failure").inc()
         traces.append(dict(step_name="inspection_failed", skill_name=None, tool_name=None,
                            input_summary=f"product_id={product.product_id}", output_summary=type(exc).__name__,
                            latency_ms=0, status="failure"))
@@ -132,6 +150,14 @@ def perform_inspection(product: ProductInput, db: Session, mode: str, trigger_so
         if isinstance(exc, ValueError):
             raise HTTPException(status_code=422, detail="无法可靠识别类目，请明确填写食品、美妆或3C。") from exc
         raise HTTPException(status_code=500, detail="质检失败，请检查服务状态。") from exc
+    finally:
+        INSPECTION_SECONDS.labels(mode).observe(time.monotonic() - started)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/api/products/inspect", response_model=InspectionReport)
@@ -192,6 +218,7 @@ def rules(category: Literal["食品", "美妆", "3C"], query: str = "", issue_ty
 def evaluate(mode: Literal["rules", "full"] = "rules", username: str = Depends(require_admin),
              db: Session = Depends(get_db)):
     from evaluator.run_eval import DEFAULT_REPORT, load_cases, persist_results, run_evaluation, write_report
+    DEFAULT_REPORT = evaluation_path(DEFAULT_REPORT)
 
     if not EVALUATION_LOCK.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="已有评测正在执行，请稍后查看结果。")
@@ -223,6 +250,7 @@ def evaluate(mode: Literal["rules", "full"] = "rules", username: str = Depends(r
 @app.get("/api/evaluations/latest")
 def latest_evaluation():
     from evaluator.run_eval import DEFAULT_REPORT
+    DEFAULT_REPORT = evaluation_path(DEFAULT_REPORT)
 
     if not DEFAULT_REPORT.exists():
         raise HTTPException(status_code=404, detail="尚未执行评测")

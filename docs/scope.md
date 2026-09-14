@@ -1,15 +1,18 @@
 # Current scope
 
+> Version 2 update: the [current platform guide](platform-operations.md) supersedes earlier single-tenant/public-API examples in this document. Current behavior uses LLM-led full-mode review, database-per-tenant isolation, authenticated data routes, Redis Streams, concurrent workers, JSON logs and [metrics/SLOs](slo.md). Historical roadmap items for these capabilities are now implemented; live marketplace integration and production HA remain future work.
+
 ## Implemented
 
 - Chinese product-copy checks for food, beauty and electronics (3C).
 - Deterministic rules with Elasticsearch keyword retrieval, MySQL fallback and bundled JSON fallback.
-- Optional DeepSeek semantic analysis in full mode; rules mode needs no model key.
+- LLM-led DeepSeek semantic analysis in full mode with mandatory rule safeguards; explicit rules baselines need no model key.
 - Structured reports, evidence, rule references, warnings, execution traces and conservative copy suggestions.
-- MySQL-backed catalog, immutable revisions, version-aware inspection, audit history and a single-admin console.
-- Synchronous inspection plus durable MySQL jobs with leases, heartbeats, bounded retries and cancellation.
+- Independent MySQL schemas/accounts per tenant, immutable revisions, version-aware inspection, audit history and a tenant-admin console.
+- Synchronous inspection plus durable MySQL/Redis Streams jobs, concurrent workers, item leases, heartbeats, bounded retries, cancellation and failed-job replay.
 - Single and batch inspection, batch publication preview and per-item publication transactions.
-- Bilingual browser UI and deterministic synthetic merchant-submission generator.
+- Bilingual browser UI and deterministic multi-tenant synthetic generation at 10,000+ records.
+- Distributed model request/concurrency limits, tenant queue capacity, JSON logs, Prometheus/Grafana, local alert delivery and explicit SLO targets.
 
 ## Deliberate exclusions
 

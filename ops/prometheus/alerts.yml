@@ -1,0 +1,38 @@
+groups:
+  - name: quality-agent
+    rules:
+      - alert: ServiceDown
+        expr: up{job=~"api|worker"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "API or worker metrics endpoint is unavailable"}
+      - alert: WorkerStalled
+        expr: time() - qa_worker_heartbeat_timestamp_seconds > 60
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Worker cannot reconcile MySQL and Redis"}
+      - alert: QueueAgeExceeded
+        expr: qa_queue_oldest_age_seconds > 300
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Queue work is older than the five-minute target"}
+      - alert: TenantDatabaseUnavailable
+        expr: qa_tenant_reconciliation_failures > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "At least one tenant database cannot be reconciled; healthy tenants continue"}
+      - alert: ApiErrorBudgetFastBurn
+        expr: (sum(rate(qa_http_requests_total{route=~"/api/.*",status=~"5.."}[5m])) / clamp_min(sum(rate(qa_http_requests_total{route=~"/api/.*",status!~"4.."}[5m])), 0.001) > 0.0144) and (sum(rate(qa_http_requests_total{route=~"/api/.*",status=~"5.."}[1h])) / clamp_min(sum(rate(qa_http_requests_total{route=~"/api/.*",status!~"4.."}[1h])), 0.001) > 0.0144)
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "API 99.9% availability budget burns over 14.4x in both windows"}
+      - alert: ModelFailureRateHigh
+        expr: sum(rate(qa_llm_calls_total{outcome="failure"}[10m])) / clamp_min(sum(rate(qa_llm_calls_total[10m])), 0.001) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "More than 10% of logical LLM calls fail; review degraded reports"}
+      - alert: InspectionCompletionSloBurn
+        expr: ((1 - (sum(rate(qa_job_end_to_end_seconds_bucket{le="300.0",outcome="success"}[1h])) or vector(0)) / clamp_min(sum(rate(qa_job_end_to_end_seconds_count[1h])), 0.001)) > 0.05) and (sum(rate(qa_job_end_to_end_seconds_count[1h])) > 0)
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Over 5% of terminal inspections fail or exceed five minutes"}

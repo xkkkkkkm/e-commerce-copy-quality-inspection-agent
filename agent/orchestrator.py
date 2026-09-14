@@ -186,7 +186,7 @@ class AgentOrchestrator:
         if not state.category:
             if self.mode == "full" and self.llm.enabled:
                 try:
-                    decision = self.llm.generate_json("category", {"product": state.product}, CategoryDecision)
+                    decision = await asyncio.to_thread(self.llm.generate_json, "category", {"product": state.product}, CategoryDecision)
                     state.category = decision.category
                     self._trace(state, "category_identification", tool_name="deepseek.category",
                                 output_summary=state.category, started=started)
@@ -203,9 +203,9 @@ class AgentOrchestrator:
         started = time.perf_counter()
         query = f"{normalized.title} {normalized.description}"
         try:
-            state.retrieved_rules = self.retriever.retrieve(state.category, query, top_k=5)
+            state.retrieved_rules = await asyncio.to_thread(self.retriever.retrieve, state.category, query, top_k=5)
             retrieval_warning = self.retriever.last_warning
-            state.rules = self.retriever.list_rules(state.category)
+            state.rules = await asyncio.to_thread(self.retriever.list_rules, state.category)
             state.retrieval_source = self.retriever.last_source
             for warning in (retrieval_warning, self.retriever.last_warning):
                 if warning and warning not in state.warnings:
@@ -217,6 +217,10 @@ class AgentOrchestrator:
         self._trace(state, "rule_retriever", tool_name=f"rules.{state.retrieval_source}", started=started,
                     output_summary=f"top_k={[r['rule_id'] for r in state.retrieved_rules]}, applicable={len(state.rules)}",
                     status="degraded" if retrieval_warning or getattr(self.retriever, "last_warning", "") else "success")
+        # LLM leads the semantic decision from original input and policy. It
+        # cannot see/merely echo a pre-computed rules report. Deterministic
+        # checks subsequently add mandatory safeguards; they cannot be vetoed.
+        await self._execute_skill(state, SemanticRiskSkill())
         for skill in self.general_skills:
             await self._execute_skill(state, skill)
         await self._execute_skill(state, category_skill)
@@ -227,7 +231,6 @@ class AgentOrchestrator:
                 and issue.get("matched_text") and issue["matched_text"] in (other.get("matched_text") or "")
                 for other in state.issues))]
         self._bind_rules(state)
-        await self._execute_skill(state, SemanticRiskSkill())
         self._bind_rules(state)
         scoring = await self._execute_skill(state, self.scoring_skill)
         state.score_result = scoring["metadata"] if scoring else risk_score_calculator(state.issues)["metadata"]

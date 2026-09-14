@@ -21,11 +21,12 @@ from sqlalchemy import delete
 
 from db.auth_models import AdminSession
 from db.session import get_db
+from services.tenancy import tenant_id, configurations
 
 
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
 COOKIE_NAME = "admin_session"
-_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}\Z")
+_TOKEN_PATTERN = re.compile(r"(?:[a-z][a-z0-9-]{0,31}\.)?[A-Za-z0-9_-]{43}\Z")
 _PASSWORD_ROUNDS = 210_000
 _FAILURE_WINDOW = 300
 _FAILURE_LIMIT = 5
@@ -46,7 +47,7 @@ class AuthSettings:
 
 
 @lru_cache(maxsize=1)
-def get_auth_settings() -> AuthSettings:
+def _default_auth_settings() -> AuthSettings:
     global _auth_fingerprint, _auth_valid_after
     username = os.getenv("ADMIN_USERNAME", "admin")
     password = os.getenv("ADMIN_PASSWORD", "admin12345")
@@ -72,6 +73,20 @@ def get_auth_settings() -> AuthSettings:
         session_hours=session_hours,
         cookie_secure=os.getenv("ADMIN_COOKIE_SECURE", "false").lower() in {"true", "1", "yes"},
     )
+
+
+def get_auth_settings() -> AuthSettings:
+    if tenant_id.get() == "default":
+        return _default_auth_settings()
+    config = configurations()[tenant_id.get()]
+    return AuthSettings(username=config["username"],
+                        password_salt=bytes.fromhex(config["password_salt"]),
+                        password_hash=bytes.fromhex(config["password_hash"]),
+                        session_hours=int(os.getenv("ADMIN_SESSION_HOURS", "8")),
+                        cookie_secure=os.getenv("ADMIN_COOKIE_SECURE", "false").lower() in {"true", "1", "yes"})
+
+
+get_auth_settings.cache_clear = _default_auth_settings.cache_clear
 
 
 class LoginBody(BaseModel):
@@ -133,6 +148,20 @@ def _shared_login_window(ip: str, *, increment: bool = False, clear: bool = Fals
     bounded in-process limiter remains active. Multiple hosts should use an
     external gateway limit in addition to this local guard.
     """
+    if os.getenv("ADMIN_DISTRIBUTED_LIMITS", "false").lower() == "true":
+        from services.broker import client
+        key = "qa:login:" + hashlib.sha256(ip.encode()).hexdigest()
+        try:
+            if clear:
+                client().delete(key)
+                return None
+            if increment:
+                client().eval("local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n", 1, key, _FAILURE_WINDOW)
+            value = client().get(key)
+            ttl = client().ttl(key)
+            return (int(value), time.time() - (_FAILURE_WINDOW - max(0, ttl))) if value else None
+        except Exception:
+            raise HTTPException(status_code=503, detail="Authentication rate limiter unavailable") from None
     path = os.getenv("ADMIN_THROTTLE_FILE", "")
     if not path:
         return None
@@ -187,7 +216,7 @@ def require_admin(request: Request, db: Session = Depends(get_db)) -> str:
     session = db.get(AdminSession, _token_hash(token))
     if session is None or session.expires_at <= datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=401, detail="请先登录管理后台")
-    if _auth_valid_after is not None and session.created_at and session.created_at < _auth_valid_after:
+    if tenant_id.get() == "default" and _auth_valid_after is not None and session.created_at and session.created_at < _auth_valid_after:
         raise HTTPException(status_code=401, detail="请先登录管理后台")
     if not hmac.compare_digest(session.username.encode(), settings.username.encode()):
         raise HTTPException(status_code=401, detail="请先登录管理后台")
@@ -203,7 +232,8 @@ def require_admin(request: Request, db: Session = Depends(get_db)) -> str:
 @router.post("/login")
 def login(body: LoginBody, request: Request, response: Response, db: Session = Depends(get_db)):
     _check_origin(request)
-    ip = request.client.host if request.client else "unknown"
+    # A successful login to tenant A must not clear tenant B's failure window.
+    ip = tenant_id.get() + ":" + (request.client.host if request.client else "unknown")
     _check_login_limit(ip)
     settings = get_auth_settings()
     candidate = hashlib.pbkdf2_hmac(
@@ -217,6 +247,8 @@ def login(body: LoginBody, request: Request, response: Response, db: Session = D
         _record_login_failure(ip)
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     token = secrets.token_urlsafe(32)
+    if tenant_id.get() != "default":
+        token = tenant_id.get() + "." + token
     expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.session_hours)
     session = AdminSession(
         token_hash=_token_hash(token), username=settings.username, expires_at=expires_at.replace(tzinfo=None),
@@ -238,13 +270,13 @@ def login(body: LoginBody, request: Request, response: Response, db: Session = D
         max_age=settings.session_hours * 3600, expires=expires_at, path="/",
     )
     response.headers["Cache-Control"] = "no-store"
-    return {"username": session.username, "csrf_token": _csrf_token(token)}
+    return {"username": session.username, "tenant": tenant_id.get(), "csrf_token": _csrf_token(token)}
 
 
 @router.get("/me")
 def me(request: Request, response: Response, username: str = Depends(require_admin)):
     response.headers["Cache-Control"] = "no-store"
-    return {"username": username, "csrf_token": _csrf_token(request.cookies[COOKIE_NAME])}
+    return {"username": username, "tenant": tenant_id.get(), "csrf_token": _csrf_token(request.cookies[COOKIE_NAME])}
 
 
 @router.post("/logout")

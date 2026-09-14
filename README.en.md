@@ -1,4 +1,4 @@
-# Product Copy Quality Agent: English entry point
+# E-commerce Copy Quality Inspection Agent: English entry point
 
 The English project overview is the repository's default [README](README.md).
 

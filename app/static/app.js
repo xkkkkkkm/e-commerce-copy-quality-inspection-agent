@@ -134,6 +134,12 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      if (options.method && !["GET", "HEAD"].includes(options.method.toUpperCase()) && !options.headers?.["X-CSRF-Token"]) {
+        const sessionResponse = await fetch("/api/admin/auth/me", { signal: controller.signal });
+        if (sessionResponse.status === 401) throw new Error(t("请先登录管理后台"));
+        const session = await sessionResponse.json();
+        options.headers = { ...options.headers, "X-CSRF-Token": session.csrf_token };
+      }
       const response = await fetch(path, { ...options, signal: controller.signal, headers: { Accept: "application/json", ...options.headers } });
       const raw = await response.text();
       let body = null;
@@ -556,5 +562,6 @@
   localized("run-evaluation", "运行评测 ↗");
   localized("evaluation-status", "运行后显示整体指标、分品类结果和逐条明细。");
   window.I18n.apply();
+  document.querySelector('input[name="mode"][value="full"]').checked = true;
   applySample("high");
 })();

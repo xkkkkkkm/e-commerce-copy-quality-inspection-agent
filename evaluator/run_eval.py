@@ -202,7 +202,7 @@ def local_inspector(mode: str) -> Inspector:
 
 def api_inspector(base_url: str, mode: str, timeout: float = 180) -> Inspector:
     parts = urlsplit(base_url.rstrip("/"))
-    if parts.scheme not in {"http", "https"} or not parts.netloc:
+    if parts.scheme not in {"http", "https"} or not parts.netloc or parts.username or parts.password:
         raise ValueError("--api-url must be an absolute HTTP(S) URL")
     path = parts.path.rstrip("/")
     if not path.endswith("/api/products/inspect"):
@@ -212,11 +212,12 @@ def api_inspector(base_url: str, mode: str, timeout: float = 180) -> Inspector:
     url = urlunsplit((parts.scheme, parts.netloc, path, urlencode(query), ""))
 
     def inspect(product: ProductInput, task_id: str) -> Any:
-        request = Request(url, data=product.model_dump_json().encode("utf-8"),
-                          headers={"Content-Type": "application/json", "Accept": "application/json"},
-                          method="POST")
-        with urlopen(request, timeout=timeout) as response:
-            return json.load(response)
+        from scripts.api_session import authenticated_client
+        origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
+        with authenticated_client(origin, timeout=timeout) as client:
+            response = client.post(url, json=product.model_dump(mode="json"))
+            response.raise_for_status()
+            return response.json()
 
     return inspect
 
@@ -225,9 +226,9 @@ def persist_results(fixtures: list[dict[str, Any]], report: dict[str, Any]) -> N
     """Upsert only these case IDs; never delete tasks, results or other cases."""
     from sqlalchemy import select
     from db.models import EvaluationCase
-    from db.session import Base, SessionLocal, engine
+    from db.session import Base, SessionLocal, current_engine
 
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=current_engine())
     by_id = {case.get("case_id", case.get("product_id")): case for case in fixtures}
     with SessionLocal() as db:
         for result in report["cases"]:
