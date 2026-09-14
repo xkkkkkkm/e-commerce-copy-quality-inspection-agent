@@ -117,6 +117,117 @@ def test_redis_delivery_duplicates_and_rebuild(tenants):
             broker.client().delete(key)
 
 
+def test_failed_tenant_initialization_does_not_block_healthy_tenant(tenants, monkeypatch):
+    from fastapi.testclient import TestClient
+    import app.main as main
+    from services.tenancy import tenant_id
+    names, password = tenants
+    migrate = main.run_migrations
+    def unavailable(bind):
+        if tenant_id.get() == names[1]:
+            raise ConnectionError("test tenant database unavailable")
+        return migrate(bind)
+    with monkeypatch.context() as patch:
+        patch.setattr(main, "run_migrations", unavailable)
+        with TestClient(main.app) as client:
+            assert client.get("/health").status_code == 200
+            good = client.post("/api/admin/auth/login", params={"tenant": names[0]}, json={"username": "admin", "password": password})
+            assert good.status_code == 200
+            assert client.get("/api/admin/products").status_code == 200
+            bad = client.post("/api/admin/auth/login", params={"tenant": names[1]}, json={"username": "admin", "password": password})
+            assert bad.status_code == 503
+    # A coordinated restart retries initialization after the operator restores DB access.
+    with TestClient(main.app) as client:
+        assert client.post("/api/admin/auth/login", params={"tenant": names[1]}, json={"username": "admin", "password": password}).status_code == 200
+
+
+@pytest.mark.parametrize("crash_phase", ["during_execution", "after_catalog_commit"])
+def test_worker_recovers_process_exit_without_duplicate_results(tenants, monkeypatch, crash_phase):
+    from sqlalchemy import select, update, func
+    from services.tenancy import tenant_scope
+    from services import jobs, catalog
+    from scripts import worker
+    from db.session import SessionLocal
+    from db.job_models import InspectionJobItem
+    from db.catalog_models import ProductInspection
+    from db.models import InspectionTask, InspectionResult
+    from app.catalog_schemas import ProductCreate
+    from services.simulation import generate_preview
+    import app.main as main
+
+    class SimulatedProcessExit(BaseException):
+        pass
+
+    finish = jobs.finish_item
+    def crashing_runner(*args, task_id=None, **kwargs):
+        raise SimulatedProcessExit()
+    def crashing_finish(*args, **kwargs):
+        raise SimulatedProcessExit()
+
+    with tenant_scope(tenants[0][0]), SessionLocal() as db:
+        product = catalog.create_product(db, ProductCreate(**generate_preview({"count": 1})["products"][0]["product"]), "test")
+        job = jobs.enqueue(db, [{"id": product["id"], "expected_version": 1}], "rules", "worker-crash", "test")
+        item_id = db.scalar(select(InspectionJobItem.id).where(InspectionJobItem.job_id == job["id"]))
+        with monkeypatch.context() as patch:
+            if crash_phase == "during_execution":
+                patch.setattr(main, "perform_inspection", crashing_runner)
+            else:
+                patch.setattr(jobs, "finish_item", crashing_finish)
+            with pytest.raises(SimulatedProcessExit):
+                worker.execute_once(db, "dead-worker", item_id=item_id)
+        db.rollback()
+        original_task = db.get(InspectionJobItem, item_id).task_id
+        assert db.scalar(select(InspectionTask).where(InspectionTask.task_id == original_task))
+        db.execute(update(InspectionJobItem).where(InspectionJobItem.id == item_id)
+                   .values(lease_until=jobs._now().replace(year=2000)))
+        db.commit()
+        assert jobs.recover_expired(db) == 1
+        db.get(InspectionJobItem, item_id).next_attempt_at = jobs._now().replace(year=2000)
+        db.commit()
+        assert not finish(db, item_id, ok=True, owner="dead-worker")
+        assert worker.execute_once(db, "replacement-worker", item_id=item_id)
+        db.rollback()  # Observe the replacement's separate completion transaction.
+        item = db.get(InspectionJobItem, item_id)
+        assert item.status == "success"
+        attempts = list(db.scalars(select(ProductInspection).where(ProductInspection.managed_product_id == product["id"])))
+        assert len(attempts) == (2 if crash_phase == "during_execution" else 1)
+        assert (item.task_id != original_task) == (crash_phase == "during_execution")
+        assert db.scalar(select(func.count()).select_from(InspectionResult)) == 1
+        assert not worker.execute_once(db, "duplicate-delivery", item_id=item_id)
+
+
+def test_legacy_schema_migration_preserves_rows_and_active_leases():
+    from db.migrations import run_migrations
+    admin = create_engine(os.environ["MYSQL_ADMIN_URL"])
+    schema = "qa_migration_" + uuid4().hex[:16]
+    migrated = None
+    try:
+        with admin.begin() as connection:
+            connection.execute(text(f"CREATE DATABASE `{schema}`"))
+        migrated = create_engine(admin.url.set(database=schema))
+        with migrated.begin() as connection:
+            connection.execute(text("CREATE TABLE inspection_tasks (id INT PRIMARY KEY, product_id VARCHAR(128))"))
+            connection.execute(text("CREATE TABLE inspection_jobs (id VARCHAR(64) PRIMARY KEY, lease_owner VARCHAR(128), lease_until DATETIME)"))
+            connection.execute(text("CREATE TABLE inspection_job_items (id INT PRIMARY KEY, job_id VARCHAR(64), status VARCHAR(16))"))
+            connection.execute(text("INSERT INTO inspection_tasks VALUES (1, 'preserved-product')"))
+            connection.execute(text("INSERT INTO inspection_jobs VALUES ('old-job', 'old-worker', '2030-01-01 00:00:00')"))
+            connection.execute(text("INSERT INTO inspection_job_items VALUES (1, 'old-job', 'running'), (2, 'old-job', 'queued')"))
+        assert len(run_migrations(migrated)) == 8
+        assert run_migrations(migrated) == []
+        with migrated.connect() as connection:
+            assert connection.scalar(text("SELECT product_id FROM inspection_tasks")) == "preserved-product"
+            rows = connection.execute(text("SELECT lease_owner, lease_until FROM inspection_job_items ORDER BY id")).all()
+            assert rows[0][0] == "old-worker" and rows[0][1].year == 2030
+            assert rows[1] == (None, None)
+            assert connection.scalar(text("SELECT payload_hash FROM inspection_jobs")) == ""
+    finally:
+        if migrated is not None:
+            migrated.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f"DROP DATABASE IF EXISTS `{schema}`"))
+        admin.dispose()
+
+
 def test_every_model_http_retry_consumes_rate_budget(monkeypatch):
     import httpx
     from pydantic import BaseModel

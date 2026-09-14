@@ -267,3 +267,21 @@ def test_tenant_queue_capacity_serializes_concurrent_admission(queue_store, monk
                 return "full"
     with ThreadPoolExecutor(2) as pool:
         assert sorted(pool.map(admit, [0, 1])) == ["accepted", "full"]
+
+
+def test_admission_works_with_one_connection_and_releases_it(queue_store):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from db.session import engine
+    from services import jobs
+    tiny = create_engine(engine.url, pool_size=1, max_overflow=0, pool_timeout=.2)
+    try:
+        with Session(tiny, autoflush=False, expire_on_commit=False) as db:
+            key = "one-connection-" + uuid4().hex
+            job = _enqueue(db, queue_store, key=key)
+            assert _enqueue(db, queue_store, key=key)["id"] == job["id"]
+            item = jobs.claim(db, "single-pool-worker")
+            assert jobs.finish_item(db, item, ok=True, owner="single-pool-worker")
+        assert tiny.pool.checkedout() == 0
+    finally:
+        tiny.dispose()

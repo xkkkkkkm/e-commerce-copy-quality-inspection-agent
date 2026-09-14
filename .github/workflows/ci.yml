@@ -40,6 +40,8 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -52,8 +54,13 @@ jobs:
           python -c "from app.main import app; from db.session import Base, engine; Base.metadata.create_all(engine)"
           python -m scripts.seed_data
       - run: python -m pytest -q
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install pip-audit==2.10.1
+          pip-audit -r requirements.txt --progress-spinner off
       - run: npm ci --ignore-scripts
       - run: npm test
+      - run: npm audit --audit-level=high
       - name: Check browser scripts
         run: |
           node --check app/static/i18n.js
@@ -61,6 +68,6 @@ jobs:
           node --check app/static/app.js
           node --check app/static/select-controls.js
       - run: docker compose config --quiet
-      - run: python -m scripts.check_secrets
+      - run: python -m scripts.check_secrets --history
       - name: Validate alert rules
         run: docker run --rm --entrypoint promtool -v "$PWD/ops/prometheus:/etc/prometheus:ro" -w /etc/prometheus prom/prometheus:v3.2.1 test rules alerts.test.yml

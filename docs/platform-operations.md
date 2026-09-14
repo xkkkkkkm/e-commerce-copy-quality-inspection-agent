@@ -38,6 +38,8 @@ Stop the old worker, deploy the new image, then restart it after API migration s
 
 Migrations are additive, idempotent MySQL bootstrap migrations, not an Alembic migration history. Run startup migrations through one deployment coordinator; concurrent first-start schema changes across API replicas are not supported. Rollback requires the prior image and compatible schema; do not remove lease columns or restore a database over newer writes without an explicit recovery plan.
 
+A non-default tenant that fails startup initialization is unavailable (HTTP 503) while healthy tenants continue serving. Restore that tenant's database connectivity, then restart the API coordinator to retry migrations; restart workers after migration succeeds. The default database remains required for API startup. Worker reconciliation reports tenant failures separately and continues other tenants.
+
 ## Queue and concurrency
 
 `POST /api/admin/jobs` accepts up to 100 products and an idempotency key, validates tenant ownership, commits MySQL job/items and returns 202. Matching replays return the original job; changed payloads conflict. Admission uses a tenant-specific MySQL advisory lock and a pending-item count to enforce `TENANT_MAX_PENDING_ITEMS` across API replicas. HTTP 429 tells senders to back off; it is not silent acceptance.
@@ -46,7 +48,7 @@ The item table doubles as a recoverable outbox. A coordinator publishes due queu
 
 Consumer groups distribute messages. A worker obtains a short MySQL job/item lock, then owns an individual item lease while external work executes. Heartbeats renew that lease. Only its current owner may finish before expiry; stale owners cannot overwrite queue completion. Product version/current-inspection checks independently fence publication state. Final batch aggregation uses locking current reads, avoiding stale REPEATABLE READ snapshots.
 
-Three attempts are allowed, with exponential delay and jitter. A completed degraded report is archived and the next attempt gets a new execution ID; an unacknowledged crash retry retains the prior ID to reuse already-committed work. Exhaustion leaves a queryable failed item. Administrators can explicitly `POST /api/admin/jobs/{job_id}/retry`; cancellation stops queued/retry items and lets running work finish safely. Retry is not permission to publish.
+Three attempts are allowed, with exponential delay and jitter. A completed degraded report is archived and the next attempt gets a new execution ID; an unacknowledged crash retry retains the prior ID to reuse already-committed catalog work. If the prior task exists but catalog completion was interrupted, the replacement worker reserves a new execution ID under its lease and preserves the old attempt as history. External calls are at-least-once, so a crash before durable completion can repeat a model request. Exhaustion leaves a queryable failed item. Administrators can explicitly `POST /api/admin/jobs/{job_id}/retry`; cancellation stops queued/retry items and lets running work finish safely. Retry is not permission to publish.
 
 `WORKER_CONCURRENCY` defaults to 4 (1–32). Each item has its own Session; sessions are never shared across concurrent tasks. Scheduling cycles through configured tenants. Reconciliation runs separately and isolates individual tenant errors; a failed tenant is surfaced in metrics without halting healthy tenants. This is round-robin fairness, not hard per-tenant CPU/memory reservation. API Uvicorn accepts at most 128 concurrent connections/tasks; excess load can return 503.
 

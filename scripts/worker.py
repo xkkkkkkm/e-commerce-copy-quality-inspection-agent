@@ -10,6 +10,7 @@ from uuid import uuid4
 from sqlalchemy import select
 
 from db.catalog_models import ManagedProduct, ProductInspection
+from db.models import InspectionTask
 from db.job_models import InspectionJob, InspectionJobItem
 from db.session import SessionLocal
 from services import catalog, jobs
@@ -64,6 +65,19 @@ def execute_once(db, owner: str, *, item_id: int | None = None) -> bool:
                              error=None if applied else "商品版本已变化，结果仅归档",
                              owner=owner)
         return True
+    # A crash can leave an unfinished durable task. Do not insert its unique
+    # task_id again or share result writes with a late previous attempt. Keep
+    # that attempt as history and reserve a new execution under the item fence.
+    if db.scalar(select(InspectionTask.id).where(InspectionTask.task_id == task_id)) is not None:
+        db.rollback()
+        current_item = db.scalar(select(InspectionJobItem).where(InspectionJobItem.id == item_id)
+                                 .with_for_update().execution_options(populate_existing=True))
+        if (current_item.status != "running" or current_item.lease_owner != owner
+                or not current_item.lease_until or current_item.lease_until <= jobs._now()):
+            db.rollback()
+            return True
+        task_id = current_item.task_id = "task_" + uuid4().hex
+        db.commit()
     stop = threading.Event()
     heartbeat = threading.Thread(target=_renew_loop,
                                  args=(item_id, owner, stop, max(5.0, jobs.LEASE_SECONDS / 3), tenant_id.get()),

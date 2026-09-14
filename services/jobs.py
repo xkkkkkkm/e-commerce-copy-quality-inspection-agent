@@ -26,15 +26,17 @@ class QueueFullError(ValueError):
 @contextmanager
 def _admission(db):
     from sqlalchemy import text
-    # Release any authentication/read connection before obtaining the separate
-    # advisory-lock connection, avoiding pool starvation under concurrent ingress.
+    # Admission uses exactly one connection for its advisory lock and all ORM
+    # work. A waiting sender cannot consume the connection needed by the holder.
     db.rollback()
     with db.get_bind().connect() as connection:
         name = "qa_admission_" + sha256(str(connection.engine.url.database).encode()).hexdigest()[:32]
         if connection.scalar(text("SELECT GET_LOCK(:name, 5)"), {"name": name}) != 1:
             raise QueueFullError("Queue admission busy; retry later")
         try:
-            yield
+            connection.commit()  # End autobegin; MySQL named locks survive commit.
+            with Session(bind=connection, autoflush=False, expire_on_commit=False) as admitted:
+                yield admitted
         finally:
             connection.execute(text("SELECT RELEASE_LOCK(:name)"), {"name": name})
 
@@ -88,7 +90,7 @@ def enqueue(db: Session, items: list[dict], mode: str, idempotency_key: str, act
         return serialize_job(db, existing)
     # Serialize admission per tenant database, across API replicas. MySQL
     # advisory lock is released immediately after the durable enqueue commit.
-    with _admission(db):
+    with _admission(db) as db:
         existing = db.get(InspectionJob, jid)
         if existing:
             if existing.payload_hash != payload_hash:
@@ -337,7 +339,7 @@ def finish_item(db: Session, item_id: int, *, ok: bool, task_id=None,
 
 def retry_failed(db: Session, job_id: str):
     """Explicit operator retry, retaining product/version guards and task IDs."""
-    with _admission(db):
+    with _admission(db) as db:
         job = _lock_job(db, job_id)
         if not job or job.status != "failed":
             raise ValueError("Only failed jobs can be retried")

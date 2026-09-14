@@ -39,11 +39,18 @@ EVALUATION_LOCK = Lock()
 async def lifespan(app):
     from services.tenancy import tenant_names, tenant_scope
     from db.session import current_engine
+    app.state.unavailable_tenants = set()
     for name in tenant_names():
-        with tenant_scope(name):
-            bind = current_engine()
-            run_migrations(bind)
-            Base.metadata.create_all(bind=bind)
+        try:
+            with tenant_scope(name):
+                bind = current_engine()
+                run_migrations(bind)
+                Base.metadata.create_all(bind=bind)
+        except Exception as exc:
+            if name == "default":
+                raise
+            app.state.unavailable_tenants.add(name)
+            event("tenant_initialization_failed", tenant_id=name, error_code=type(exc).__name__)
     yield
 
 

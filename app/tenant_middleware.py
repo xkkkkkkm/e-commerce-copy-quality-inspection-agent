@@ -12,6 +12,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
             name = request.query_params.get("tenant", "default")
         if name not in tenant_names():
             return JSONResponse({"detail": "Invalid tenant or session"}, status_code=401)
+        if name in getattr(request.app.state, "unavailable_tenants", set()):
+            return JSONResponse({"detail": "Tenant database initialization unavailable; contact the operator"}, status_code=503)
         with tenant_scope(name):
             request.state.tenant_id = name
             # Close legacy anonymous inspection/report APIs. All tenant data
