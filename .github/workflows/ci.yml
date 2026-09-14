@@ -1,0 +1,57 @@
+name: Engineering checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: quality_agent_test
+          MYSQL_USER: quality_agent
+          MYSQL_PASSWORD: test_password
+          MYSQL_ROOT_PASSWORD: test_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DATABASE_URL: mysql+pymysql://quality_agent:test_password@127.0.0.1:3306/quality_agent_test?charset=utf8mb4
+      ELASTICSEARCH_URL: http://127.0.0.1:19200
+      DEEPSEEK_API_KEY: ""
+      APP_ENV: local
+      RUN_MYSQL_TESTS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Initialize isolated test database
+        run: |
+          python -c "from app.main import app; from db.session import Base, engine; Base.metadata.create_all(engine)"
+          python -m scripts.seed_data
+      - run: python -m pytest -q
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - name: Check browser scripts
+        run: |
+          node --check app/static/i18n.js
+          node --check app/static/admin.js
+          node --check app/static/app.js
+          node --check app/static/select-controls.js
+      - run: docker compose config --quiet

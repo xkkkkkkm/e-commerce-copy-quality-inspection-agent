@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#183e38">
+  <meta name="description" content="商品内容管理后台：统一管理商品文案、质检与发布审核。">
+  <title data-i18n="商品管理 · 文案质检管理后台">商品管理 · 文案质检管理后台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%23183e38'/%3E%3Cpath d='m13 25 7 7 15-17' stroke='%23fff' stroke-width='4' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/admin.css?v=20260911-4">
+  <link rel="stylesheet" href="/static/controls.css?v=20260911-3">
+  <script src="/static/i18n.js?v=20260911-3" defer></script>
+  <script src="/static/admin-messages.js?v=20260911-4" defer></script>
+  <script src="/static/admin.js?v=20260911-4" defer></script>
+  <script src="/static/select-controls.js?v=20260911-3" defer></script>
+</head>
+<body>
+  <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z M3 8v9l9 5 9-5V8 M12 13v9 M7.5 5.5l9 5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z M12 8v5 M12 16h.01"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M6 18 18 6 M6 6h12v12"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 8a8 8 0 0 0-14-3L3 8 M3 3v5h5 M4 16a8 8 0 0 0 14 3l3-3 M21 21v-5h-5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14"/></symbol>
+  </defs></svg>
+  <a class="skip-link" href="#main-content"><span data-i18n="跳转到商品管理">跳转到商品管理</span></a>
+
+  <section id="login-view" class="login-view" hidden>
+    <div class="login-language"><label class="locale-control"><span class="locale-label" data-i18n="界面语言">界面语言</span><select id="login-language" data-language-switch aria-label="界面语言" data-i18n-aria-label="界面语言"><option value="zh-CN" lang="zh-CN">中文</option><option value="en" lang="en">English</option></select></label></div>
+    <div class="login-story">
+      <a class="brand light" href="/"><span class="brand-mark">✓</span><span><span data-i18n="文案质检">文案质检</span><small>CONTENT QUALITY</small></span></a>
+      <div class="login-message"><p class="eyebrow"><span data-i18n="商品内容管理平台">商品内容管理平台</span></p><h1><span data-i18n="每一次上架，">每一次上架，</span><br><span data-i18n="都有据可循。">都有据可循。</span></h1><p><span data-i18n="从商品文案到发布审核，">从商品文案到发布审核，</span><br><span data-i18n="让内容质量贯穿每一个环节。">让内容质量贯穿每一个环节。</span></p><div class="login-flow"><span><span data-i18n="商品管理">商品管理</span></span><b>→</b><span><span data-i18n="智能质检">智能质检</span></span><b>→</b><span><span data-i18n="审核发布">审核发布</span></span></div></div>
+      <p class="login-copyright"><span data-i18n="食品 · 美妆 · 3C 数码">食品 · 美妆 · 3C 数码</span></p>
+    </div>
+    <div class="login-main"><form id="login-form" class="login-card"><span class="login-symbol">✓</span><p class="eyebrow"><span data-i18n="管理控制台">管理控制台</span></p><h2><span data-i18n="欢迎回来">欢迎回来</span></h2><p class="subtle"><span data-i18n="登录后管理商品内容与发布审核。">登录后管理商品内容与发布审核。</span></p><label for="login-username"><span data-i18n="管理员账号">管理员账号</span></label><input id="login-username" name="username" autocomplete="username" value="admin" required maxlength="128"><label for="login-password"><span data-i18n="密码">密码</span></label><input id="login-password" name="password" type="password" autocomplete="current-password" required placeholder="请输入管理员密码" data-i18n-placeholder="请输入管理员密码"><div id="login-error" class="notice error" role="alert" hidden></div><button id="login-submit" type="submit" class="button primary"><span data-i18n="登录管理后台">登录管理后台</span> <span>→</span></button><p class="demo-account"><span data-i18n="本地演示账号">本地演示账号</span> <code>admin</code> / <code>admin12345</code></p><a class="back-link" href="/"><span data-i18n="返回文案质检工作台 ↗">返回文案质检工作台 ↗</span></a></form></div>
+  </section>
+
+  <div id="app-view" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="/admin"><span class="brand-mark">✓</span><span><span data-i18n="文案质检">文案质检</span><small><span data-i18n="管理控制台">管理控制台</span></small></span></a>
+      <p class="nav-label"><span data-i18n="工作空间">工作空间</span></p>
+      <nav aria-label="后台导航" data-i18n-aria-label="后台导航">
+        <button class="nav-item active" type="button" data-nav="all"><svg class="icon"><use href="#i-box"/></svg><span><span data-i18n="商品管理">商品管理</span></span><span id="nav-total" class="nav-count">—</span></button>
+        <button class="nav-item" type="button" data-nav="pending"><svg class="icon"><use href="#i-clock"/></svg><span><span data-i18n="待审核">待审核</span></span><span id="nav-pending" class="nav-count">—</span></button>
+        <button class="nav-item" type="button" data-nav="high"><svg class="icon"><use href="#i-shield"/></svg><span><span data-i18n="高风险商品">高风险商品</span></span><span id="nav-high" class="nav-count danger-count">—</span></button>
+      </nav>
+      <div class="sidebar-bottom"><a href="/" class="workbench-link"><svg class="icon"><use href="#i-grid"/></svg><span><span data-i18n="文案质检工作台">文案质检工作台</span></span><svg class="icon small"><use href="#i-arrow"/></svg></a><div class="workspace-note"><span class="live-dot"></span><div><span data-i18n="本地演示工作空间">本地演示工作空间</span><small><span data-i18n="商品发布状态仅在本平台生效">商品发布状态仅在本平台生效</span></small></div></div></div>
+    </aside>
+    <div class="app-main">
+      <header class="topbar"><div class="breadcrumb"><span data-i18n="工作空间">工作空间</span> <span>/</span><strong><span data-i18n="商品管理">商品管理</span></strong></div><div class="topbar-right"><span class="environment-tag"><span data-i18n="演示环境">演示环境</span></span><label class="locale-control"><span class="locale-label" data-i18n="界面语言">界面语言</span><select id="admin-language" data-language-switch aria-label="界面语言" data-i18n-aria-label="界面语言"><option value="zh-CN" lang="zh-CN">中文</option><option value="en" lang="en">English</option></select></label><details id="admin-menu" class="admin-menu"><summary><span class="avatar">A</span><span id="admin-name"><span data-i18n="管理员">管理员</span></span><span class="caret">⌄</span></summary><div class="admin-dropdown"><p><span data-i18n="管理员账户">管理员账户</span></p><button id="logout" type="button"><span data-i18n="退出登录">退出登录</span></button></div></details></div></header>
+      <main id="main-content" tabindex="-1">
+        <section class="page-heading"><div><p class="eyebrow">PRODUCT CONTENT MANAGEMENT</p><h1><span data-i18n="商品管理">商品管理</span><span class="heading-dot"></span></h1><p class="subtle"><span data-i18n="统一管理商品文案，用质检守好每一次发布。">统一管理商品文案，用质检守好每一次发布。</span></p></div><div class="heading-actions"><button id="simulate-products" type="button" class="button secondary" data-i18n="模拟数据">模拟数据</button><button id="create-product" type="button" class="button primary"><svg class="icon"><use href="#i-plus"/></svg><span data-i18n="新增商品">新增商品</span></button></div></section>
+        <section class="summary-grid" aria-label="商品概览" data-i18n-aria-label="商品概览">
+          <button type="button" class="summary-card" data-metric="all"><span class="metric-icon"><svg class="icon"><use href="#i-box"/></svg></span><span class="metric-label"><span data-i18n="全部商品">全部商品</span></span><strong id="metric-total">—</strong><span class="metric-foot"><span id="metric-merchants">—</span> <span data-i18n="家商家入驻">家商家入驻</span></span></button>
+          <button type="button" class="summary-card" data-metric="published"><span class="metric-icon green"><svg class="icon"><use href="#i-check"/></svg></span><span class="metric-label"><span data-i18n="已发布">已发布</span></span><strong id="metric-published">—</strong><span class="metric-foot"><span data-i18n="内容已审核发布">内容已审核发布</span></span></button>
+          <button type="button" class="summary-card" data-metric="pending"><span class="metric-icon amber"><svg class="icon"><use href="#i-clock"/></svg></span><span class="metric-label"><span data-i18n="待审核">待审核</span></span><strong id="metric-pending">—</strong><span class="metric-foot"><span data-i18n="等待内容复核">等待内容复核</span> <span>→</span></span></button>
+          <button type="button" class="summary-card" data-metric="high"><span class="metric-icon red"><svg class="icon"><use href="#i-shield"/></svg></span><span class="metric-label"><span data-i18n="高风险商品">高风险商品</span></span><strong id="metric-high_risk">—</strong><span class="metric-foot"><span data-i18n="需优先处理风险">需优先处理风险</span> <span>→</span></span></button>
+        </section>
+        <section class="catalog-panel" aria-labelledby="catalog-title">
+          <div class="catalog-heading"><div><h2 id="catalog-title"><span data-i18n="商品列表">商品列表</span></h2><span id="list-count" class="subtle"><span data-i18n="正在加载商品…">正在加载商品…</span></span></div><button id="refresh-list" class="button ghost compact" type="button"><svg class="icon small"><use href="#i-refresh"/></svg><span data-i18n="刷新">刷新</span></button></div>
+          <div class="status-tabs" role="tablist" aria-label="商品状态" data-i18n-aria-label="商品状态"><button type="button" class="status-tab active" role="tab" aria-selected="true" data-status=""><span data-i18n="全部商品">全部商品</span></button><button type="button" class="status-tab" role="tab" aria-selected="false" data-status="pending"><span data-i18n="待审核">待审核</span></button><button type="button" class="status-tab" role="tab" aria-selected="false" data-status="published"><span data-i18n="已发布">已发布</span></button><button type="button" class="status-tab" role="tab" aria-selected="false" data-status="rejected"><span data-i18n="已退回">已退回</span></button><button type="button" class="status-tab" role="tab" aria-selected="false" data-status="offline"><span data-i18n="已下架">已下架</span></button><button type="button" class="status-tab" role="tab" aria-selected="false" data-status="draft"><span data-i18n="草稿">草稿</span></button></div>
+          <form id="filter-form" class="filter-bar"><div class="search-input"><svg class="icon small"><use href="#i-search"/></svg><input id="filter-q" type="search" maxlength="200" aria-label="搜索商品" data-i18n-aria-label="搜索商品" placeholder="搜索商品名称、ID 或商家" data-i18n-placeholder="搜索商品名称、ID 或商家"></div><select id="filter-category" aria-label="按商品类目筛选" data-i18n-aria-label="按商品类目筛选"><option value="" data-i18n="全部类目">全部类目</option><option value="食品" data-i18n="食品">食品</option><option value="美妆" data-i18n="美妆">美妆</option><option value="3C" data-i18n="3C 数码">3C 数码</option></select><select id="filter-risk" aria-label="按质检风险筛选" data-i18n-aria-label="按质检风险筛选"><option value="" data-i18n="全部质检结果">全部质检结果</option><option value="high" data-i18n="高风险">高风险</option><option value="medium" data-i18n="中风险">中风险</option><option value="low" data-i18n="低风险">低风险</option><option value="pass" data-i18n="通过">通过</option><option value="uninspected" data-i18n="待质检">待质检</option></select><button type="submit" class="button secondary"><span data-i18n="查询">查询</span></button><button id="reset-filters" type="button" class="button ghost"><span data-i18n="重置">重置</span></button></form>
+          <div id="list-error" class="notice error panel-notice" role="alert" hidden></div>
+          <div id="batch-bar" class="batch-bar" hidden><span><span data-i18n="已选择">已选择</span> <strong id="selected-count">0</strong> <span data-i18n="件商品">件商品</span></span><select id="batch-mode" aria-label="批量质检模式" data-i18n-aria-label="批量质检模式"><option value="rules" data-i18n="规则模式">规则模式</option><option value="full" data-i18n="完整模式">完整模式</option></select><button id="batch-inspect" class="button primary compact" type="button"><span data-i18n="批量质检">批量质检</span></button><button id="clear-selection" class="button ghost compact" type="button"><span data-i18n="取消选择">取消选择</span></button><span class="batch-limit"><span data-i18n="每批最多 20 件">每批最多 20 件</span></span></div>
+          <p id="batch-published-warning" class="notice warning panel-notice" hidden><span data-i18n="选中商品包含已发布商品。重新质检会暂时撤回发布，完成后需重新确认发布。">选中商品包含已发布商品。重新质检会暂时撤回发布，完成后需重新确认发布。</span></p>
+          <div id="batch-results" class="batch-results" aria-label="批量操作结果" data-i18n-aria-label="批量操作结果" hidden></div>
+          <div class="table-scroll"><table class="product-table"><thead><tr><th class="check-cell"><input id="select-all" type="checkbox" aria-label="选择本页商品" data-i18n-aria-label="选择本页商品"></th><th><span data-i18n="商品信息">商品信息</span></th><th><span data-i18n="商家 / 类目">商家 / 类目</span></th><th><span data-i18n="发布状态">发布状态</span></th><th><span data-i18n="当前版本质检">当前版本质检</span></th><th><span data-i18n="最近更新">最近更新</span></th><th class="action-heading"><span data-i18n="操作">操作</span></th></tr></thead><tbody id="products-body"></tbody></table></div>
+          <div id="list-empty" class="list-empty" hidden><span class="empty-icon"><svg class="icon"><use href="#i-box"/></svg></span><h3><span data-i18n="没有找到符合条件的商品">没有找到符合条件的商品</span></h3><p><span data-i18n="试试调整筛选条件，或新增第一件商品。">试试调整筛选条件，或新增第一件商品。</span></p><button id="empty-reset" class="button secondary compact" type="button"><span data-i18n="清除筛选条件">清除筛选条件</span></button></div>
+          <div id="list-loading" class="list-loading" role="status"><span class="spinner"></span><span data-i18n="正在加载商品列表">正在加载商品列表</span></div>
+          <footer class="pagination"><span id="pagination-info">—</span><div><label for="page-size"><span data-i18n="每页">每页</span></label><select id="page-size"><option value="10" data-i18n="10 条">10 条</option><option value="20" selected data-i18n="20 条">20 条</option><option value="50" data-i18n="50 条">50 条</option></select><button id="prev-page" class="page-button" type="button" aria-label="上一页" data-i18n-aria-label="上一页">‹</button><span id="page-current">1 / 1</span><button id="next-page" class="page-button" type="button" aria-label="下一页" data-i18n-aria-label="下一页">›</button></div></footer>
+        </section>
+        <footer class="page-footer"><span><span data-i18n="文案质检 · 商品内容管理平台">文案质检 · 商品内容管理平台</span></span><span><span data-i18n="修改文案后，请重新质检并审核发布。">修改文案后，请重新质检并审核发布。</span></span></footer>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="detail-dialog" class="drawer" aria-labelledby="detail-title"><div class="drawer-heading"><div><p class="eyebrow"><span data-i18n="商品详情">商品详情</span></p><h2 id="detail-title"><span data-i18n="商品详情">商品详情</span></h2></div><button class="icon-button" type="button" data-close="detail-dialog" aria-label="关闭商品详情" data-i18n-aria-label="关闭商品详情">×</button></div><div id="detail-content" class="drawer-content"></div></dialog>
+  <dialog id="editor-dialog" class="drawer editor-drawer" aria-labelledby="editor-title"><form id="editor-form"><div class="drawer-heading"><div><p class="eyebrow">PRODUCT INFORMATION</p><h2 id="editor-title"><span data-i18n="新增商品">新增商品</span></h2></div><button class="icon-button" type="button" data-close="editor-dialog" aria-label="关闭商品编辑" data-i18n-aria-label="关闭商品编辑">×</button></div><div class="drawer-content editor-content"><p id="editor-notice" class="notice info"><span data-i18n="保存后进入待审核状态。完成当前版本质检后，方可审核发布。">保存后进入待审核状态。完成当前版本质检后，方可审核发布。</span></p><div class="form-grid"><label><span data-i18n="商品 ID">商品 ID</span> <span class="required">*</span><input id="edit-product-id" required maxlength="128" placeholder="如 SKU-2026-001" data-i18n-placeholder="如 SKU-2026-001"></label><label><span data-i18n="所属商家">所属商家</span> <span class="required">*</span><input id="edit-merchant" required maxlength="128" placeholder="填写商家名称" data-i18n-placeholder="填写商家名称"></label></div><label><span data-i18n="商品类目">商品类目</span> <span class="required">*</span><select id="edit-category" required><option value="" data-i18n="请选择类目">请选择类目</option><option value="食品" data-i18n="食品">食品</option><option value="美妆" data-i18n="美妆">美妆</option><option value="3C" data-i18n="3C 数码">3C 数码</option></select></label><label><span data-i18n="商品标题">商品标题</span> <span class="required">*</span><textarea id="edit-title" required maxlength="500" rows="2" placeholder="填写准确、清晰的商品标题" data-i18n-placeholder="填写准确、清晰的商品标题"></textarea></label><label><span data-i18n="商品描述">商品描述</span><textarea id="edit-description" maxlength="20000" rows="5" placeholder="填写商品卖点、规格与适用范围" data-i18n-placeholder="填写商品卖点、规格与适用范围"></textarea></label><div class="field-heading"><label for="edit-attributes"><span data-i18n="商品属性">商品属性</span></label><button id="format-attributes" type="button" class="text-button"><span data-i18n="格式化 JSON">格式化 JSON</span></button></div><textarea id="edit-attributes" class="code-input" rows="9" spellcheck="false" aria-describedby="attributes-help">{}</textarea><p id="attributes-help" class="field-help"><span data-i18n="使用 JSON 对象填写真实属性，例如 {&quot;brand&quot;: &quot;品牌名称&quot;, &quot;specifications&quot;: &quot;规格&quot;}。">使用 JSON 对象填写真实属性，例如 {"brand": "品牌名称", "specifications": "规格"}。</span></p><div id="editor-error" class="notice error" role="alert" hidden></div></div><div class="drawer-footer"><button class="button secondary" type="button" data-close="editor-dialog"><span data-i18n="取消">取消</span></button><button id="save-product" class="button primary" type="submit"><span data-i18n="保存并待审核">保存并待审核</span></button></div></form></dialog>
+  <dialog id="action-dialog" class="modal" aria-labelledby="action-title"><form id="action-form"><div class="modal-heading"><h2 id="action-title"><span data-i18n="审核操作">审核操作</span></h2><button class="icon-button" type="button" data-close="action-dialog" aria-label="关闭审核操作" data-i18n-aria-label="关闭审核操作">×</button></div><p id="action-product" class="action-product"></p><p id="action-notice" class="notice info"></p><label for="action-reason"><span data-i18n="操作说明">操作说明</span> <span id="reason-required" class="required">*</span></label><textarea id="action-reason" rows="4" maxlength="2000" placeholder="填写审核结论与处理说明，记录将保留在操作日志中。" data-i18n-placeholder="填写审核结论与处理说明，记录将保留在操作日志中。"></textarea><div id="action-error" class="notice error" role="alert" hidden></div><div class="modal-footer"><button type="button" class="button secondary" data-close="action-dialog"><span data-i18n="取消">取消</span></button><button id="action-submit" type="submit" class="button primary"><span data-i18n="确认">确认</span></button></div></form></dialog>
+  <dialog id="report-dialog" class="drawer report-drawer" aria-labelledby="report-title"><div class="drawer-heading"><div><p class="eyebrow">INSPECTION REPORT</p><h2 id="report-title"><span data-i18n="质检报告">质检报告</span></h2></div><button class="icon-button" type="button" data-close="report-dialog" aria-label="关闭质检报告" data-i18n-aria-label="关闭质检报告">×</button></div><div id="report-content" class="drawer-content"></div></dialog>
+  <dialog id="simulation-dialog" class="drawer simulation-drawer" aria-labelledby="simulation-title">
+    <form id="simulation-form">
+      <div class="drawer-heading"><div><p class="eyebrow" data-i18n="合成演示数据">合成演示数据</p><h2 id="simulation-title" data-i18n="模拟商品数据">模拟商品数据</h2></div><button class="icon-button" type="button" data-close="simulation-dialog" aria-label="关闭模拟数据" data-i18n-aria-label="关闭模拟数据">×</button></div>
+      <div class="drawer-content editor-content">
+        <p class="notice warning" data-i18n="这些商品为合成演示数据，不代表真实商家或商品。投递不会自动发布。">这些商品为合成演示数据，不代表真实商家或商品。投递不会自动发布。</p>
+        <fieldset id="simulation-options" class="simulation-options">
+          <div class="form-grid"><label><span data-i18n="生成数量">生成数量</span><input id="simulation-count" type="number" min="1" max="100" step="1" value="30" required></label><label><span data-i18n="随机种子">随机种子</span><input id="simulation-seed" type="number" min="0" max="4294967295" step="1" value="42" required></label></div>
+          <label><span data-i18n="数据场景">数据场景</span><select id="simulation-scenario"><option value="mixed" data-i18n="混合场景">混合场景</option><option value="clean" data-i18n="合规文案">合规文案</option><option value="risky" data-i18n="风险文案">风险文案</option><option value="missing" data-i18n="信息缺失">信息缺失</option><option value="conflict" data-i18n="信息冲突">信息冲突</option></select></label>
+          <label><span data-i18n="批次 ID">批次 ID</span><input id="simulation-batch-id" maxlength="64" value="demo-42" required pattern="[A-Za-z0-9][A-Za-z0-9_\-]*"></label>
+          <label class="simulation-enqueue"><input id="simulation-enqueue" type="checkbox" checked><span data-i18n="投递后自动进行规则质检">投递后自动进行规则质检</span></label>
+        </fieldset>
+        <p id="simulation-hint" class="field-help" data-i18n="请先生成预览，再投递同一批次的数据。">请先生成预览，再投递同一批次的数据。</p>
+        <div id="simulation-error" class="notice error" role="alert" hidden></div>
+        <div id="simulation-preview" class="simulation-preview"></div>
+        <div id="simulation-result" class="simulation-result" role="status" hidden></div>
+      </div>
+      <div class="drawer-footer"><button id="simulation-preview-button" type="submit" class="button secondary" data-i18n="预览数据">预览数据</button><button id="simulation-deliver-button" type="button" class="button primary" data-i18n="投递此预览" disabled>投递此预览</button></div>
+    </form>
+  </dialog>
+  <dialog id="batch-publish-dialog" class="drawer publication-drawer" aria-labelledby="batch-publish-title">
+    <form id="batch-publish-form">
+      <div class="drawer-heading"><div><p class="eyebrow" data-i18n="发布审核">发布审核</p><h2 id="batch-publish-title" data-i18n="批量审核发布">批量审核发布</h2></div><button type="button" class="icon-button" data-close="batch-publish-dialog" aria-label="关闭批量发布" data-i18n-aria-label="关闭批量发布">×</button></div>
+      <div class="drawer-content publication-content">
+        <p class="field-help" data-i18n="核对本次商品与报告后再发布。发布仅更新本平台状态。">核对本次商品与报告后再发布。发布仅更新本平台状态。</p>
+        <p id="batch-publish-summary" class="notice info" role="status"></p>
+        <div id="batch-publish-items" class="publication-items"></div>
+        <fieldset id="batch-publish-review" class="publication-review" hidden>
+          <p class="field-help" data-i18n="通过的商品默认勾选；中低风险商品需逐件查看问题后手动勾选。">通过的商品默认勾选；中低风险商品需逐件查看问题后手动勾选。</p>
+          <label for="batch-publish-reason"><span data-i18n="审核说明">审核说明</span> <span class="required">*</span></label>
+          <textarea id="batch-publish-reason" rows="3" maxlength="2000" required data-i18n-placeholder="说明本批商品可发布的依据；该说明将逐件记录。" placeholder="说明本批商品可发布的依据；该说明将逐件记录。"></textarea>
+          <label class="publication-confirm"><input id="batch-publish-confirm" type="checkbox" required><span data-i18n="我已核对所选商品内容及质检问题，确认允许发布。">我已核对所选商品内容及质检问题，确认允许发布。</span></label>
+        </fieldset>
+        <div id="batch-publish-error" class="notice error" role="alert" hidden></div>
+      </div>
+      <div class="drawer-footer publication-footer"><button type="button" class="button secondary" data-close="batch-publish-dialog" data-i18n="关闭">关闭</button><button id="batch-publish-recheck" type="button" class="button secondary" data-i18n="重新检查" hidden>重新检查</button><button id="batch-publish-submit" type="submit" class="button primary" disabled data-i18n="确认发布">确认发布</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

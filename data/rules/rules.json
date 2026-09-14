@@ -1,0 +1,465 @@
+[
+  {
+    "rule_id": "general_title_001",
+    "category": "通用",
+    "issue_type": "标题过长",
+    "risk_level": "low",
+    "rule_text": "商品标题应简明并保留核心商品属性，项目演示阈值为60个字符（含空格标点），超过阈值提示优化。",
+    "bad_examples": [
+      "长度超过60个字符的商品标题"
+    ],
+    "rewrite_hint": "删去重复修饰词；例如“清风茉莉花茶袋泡茶 30包”。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_claim_001",
+    "category": "通用",
+    "issue_type": "绝对化表达",
+    "risk_level": "high",
+    "rule_text": "不得作无法验证的绝对化、最低价、国家级或安全性保证。结合上下文区分否定提醒、客观配料比例与功效承诺；100%燕麦不等于100%有效。",
+    "bad_examples": [
+      "全网最低",
+      "绝对有效",
+      "100%有效",
+      "国家级",
+      "无副作用"
+    ],
+    "rewrite_hint": "删除无法验证的承诺，只保留已提供的属性；例如“清风茉莉花茶 30包”。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_title_002",
+    "category": "通用",
+    "issue_type": "关键词堆砌",
+    "risk_level": "low",
+    "rule_text": "商品标题中的旗舰、爆款、特价、正品、新品、官方等营销词不应重复堆砌。",
+    "bad_examples": [
+      "官方旗舰正品爆款新品官方旗舰正品爆款新品"
+    ],
+    "rewrite_hint": "每个必要修饰词最多保留一次，优先保留商品品类与规格。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_title_003",
+    "category": "通用",
+    "issue_type": "标题核心属性缺失",
+    "risk_level": "low",
+    "rule_text": "标题应使消费者识别商品品类，不能只剩无意义的促销修饰词。词典无法识别的真实品类应转语义复核，不能直接认定违规。",
+    "bad_examples": [
+      "好物上新限时抢购"
+    ],
+    "rewrite_hint": "补充商品实际品类；例如“机械键盘 K87 青轴”。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_consistency_001",
+    "category": "通用",
+    "issue_type": "属性与文案冲突",
+    "risk_level": "medium",
+    "rule_text": "标题、描述中明确声明的品牌、产地、型号、适用范围等应与结构化属性一致；近义表述不应直接判为冲突。",
+    "bad_examples": [
+      "属性产地为浙江，描述却写产地：福建"
+    ],
+    "rewrite_hint": "依据产品标签核实后统一两处信息，不能猜测哪一处正确。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_claim_002",
+    "category": "通用",
+    "issue_type": "夸大宣传",
+    "risk_level": "high",
+    "rule_text": "不得以缺乏证据的文案夸大商品性能或健康效果；量化参数或限定条件应有输入事实支持。",
+    "bad_examples": [
+      "覆盖所有户型",
+      "喝一次就能提升免疫力"
+    ],
+    "rewrite_hint": "移除缺乏依据的结论，保留已给出的型号、配料或使用条件。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_claim_003",
+    "category": "通用",
+    "issue_type": "过度承诺",
+    "risk_level": "high",
+    "rule_text": "不得承诺任何人、任何环境下的持久效果、速成效果或零失败；否定该承诺的警示不属于正向承诺。",
+    "bad_examples": [
+      "任何环境都不会损坏",
+      "喝一周就长高"
+    ],
+    "rewrite_hint": "删除保证性结论，说明输入中已有的适用条件和限制。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_audience_001",
+    "category": "通用",
+    "issue_type": "适用人群表述不当",
+    "risk_level": "medium",
+    "rule_text": "不得在缺少限制说明时宣称所有年龄、所有身体状况的人均适用，涉及婴幼儿、孕期等人群应按标签谨慎表述。",
+    "bad_examples": [
+      "老人小孩都适合",
+      "任何人都能放心用"
+    ],
+    "rewrite_hint": "保留有依据的适用人群；例如“特殊人群请依据产品标签选择”。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_attr_001",
+    "category": "食品",
+    "issue_type": "关键信息缺失",
+    "risk_level": "medium",
+    "rule_text": "食品应提供品牌、产地、保质期、配料和储存方式；空串、空白或空容器视为缺失。",
+    "bad_examples": [
+      "保质期为空",
+      "配料为空"
+    ],
+    "rewrite_hint": "按包装标签补齐必填信息，不编造配料或期限。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_claim_001",
+    "category": "食品",
+    "issue_type": "医疗功效宣称",
+    "risk_level": "high",
+    "rule_text": "普通食品不得明示或暗示疾病治疗效果，包括改善疾病结局的承诺。明确否定治疗效果、提醒不可替代药品的陈述应排除。",
+    "bad_examples": [
+      "治疗失眠",
+      "失眠克星",
+      "喝了就能摆脱降压药"
+    ],
+    "rewrite_hint": "删去医疗暗示；例如“茉莉清香，适合日常冲泡”。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_attr_002",
+    "category": "食品",
+    "issue_type": "保质期格式异常",
+    "risk_level": "medium",
+    "rule_text": "保质期应给出有效的正数期限及单位或明确到期日期，负数、零天等无效值应核实。",
+    "bad_examples": [
+      "保质期：-3个月",
+      "保质期：0天"
+    ],
+    "rewrite_hint": "核对包装标签，填写真实期限；没有依据时仅提示待补充。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_attr_003",
+    "category": "食品",
+    "issue_type": "配料信息不明确",
+    "risk_level": "medium",
+    "rule_text": "配料字段应列出实际配料；以实物为准、保密等占位语不能代替配料信息。",
+    "bad_examples": [
+      "配料：以实物为准",
+      "配料：保密"
+    ],
+    "rewrite_hint": "按标签逐项补充配料，不能根据品名推断成分。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_attr_004",
+    "category": "食品",
+    "issue_type": "储存信息不明确",
+    "risk_level": "medium",
+    "rule_text": "储存方式应说明与商品相符的保存条件，随便放、任意环境等表述不足以指导保存。",
+    "bad_examples": [
+      "储存方式：随便放",
+      "储存方式：任意环境"
+    ],
+    "rewrite_hint": "按标签填写温度、避光、密封等真实要求。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_claim_002",
+    "category": "食品",
+    "issue_type": "夸大宣传",
+    "risk_level": "high",
+    "rule_text": "普通食品不得以无依据的功能描述承诺免疫、防病或生理指标的改善。",
+    "bad_examples": [
+      "绝对有效提升免疫力",
+      "增强免疫力保证不生病"
+    ],
+    "rewrite_hint": "删除缺少证据的健康效果，保留现有配料、口味及食用方式。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_claim_003",
+    "category": "食品",
+    "issue_type": "过度承诺",
+    "risk_level": "high",
+    "rule_text": "食品不得承诺短期长高、快速减重或食用一次即可持续改善身体状态。",
+    "bad_examples": [
+      "喝一周就长高",
+      "三天瘦十斤"
+    ],
+    "rewrite_hint": "移除速成承诺，仅描述输入已提供的规格和食用场景。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "food_audience_001",
+    "category": "食品",
+    "issue_type": "适用人群表述不当",
+    "risk_level": "medium",
+    "rule_text": "食品不应笼统承诺老人、儿童、孕妇或过敏人群均适合；有明确限定条件的正常人群说明应保留。",
+    "bad_examples": [
+      "老人小孩都适合",
+      "孕妇婴儿都能随便喝"
+    ],
+    "rewrite_hint": "依据标签补充人群限制和过敏提示，未提供依据时不新增适用人群。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_attr_001",
+    "category": "美妆",
+    "issue_type": "关键信息缺失",
+    "risk_level": "medium",
+    "rule_text": "美妆商品应说明品牌、成分、适用肤质、使用方式和注意事项；字段有值不代表内容充分。",
+    "bad_examples": [
+      "适用肤质为空",
+      "注意事项为空"
+    ],
+    "rewrite_hint": "依据标签补齐属性，不代替厂商编造使用说明。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_claim_001",
+    "category": "美妆",
+    "issue_type": "功效宣称风险",
+    "risk_level": "high",
+    "rule_text": "化妆品不得宣称永久性改变或暗示持续治疗问题肌肤，医学级等表达应有适用依据。",
+    "bad_examples": [
+      "永久美白",
+      "医学级",
+      "多年反复的小红疙瘩从此不再出现"
+    ],
+    "rewrite_hint": "移除长期功效承诺，保留已提供的日常护理用途。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_claim_002",
+    "category": "美妆",
+    "issue_type": "医疗功效宣称",
+    "risk_level": "high",
+    "rule_text": "化妆品不得宣称治疗、根治疾病或将正常老化描述为可以根治的问题；不具备治疗作用的否定警示应排除。",
+    "bad_examples": [
+      "治疗所有痘痘",
+      "根治眼周衰老"
+    ],
+    "rewrite_hint": "删除治疗性用语；例如“日常保湿护理”，仅在输入已有该用途时使用。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_claim_003",
+    "category": "美妆",
+    "issue_type": "过度承诺",
+    "risk_level": "high",
+    "rule_text": "不得承诺一次使用即可全天有效、防晒永不失效或必然产生特定效果。",
+    "bad_examples": [
+      "一整天100%不晒黑",
+      "一次涂抹全天不用补涂"
+    ],
+    "rewrite_hint": "使用输入已有的真实使用及补涂说明，删除全天保证。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_attr_002",
+    "category": "美妆",
+    "issue_type": "适用肤质表述不当",
+    "risk_level": "medium",
+    "rule_text": "适用肤质应有合理范围，不得承诺所有肤质都不会过敏；有个体差异及测试提醒的陈述不属于保证。",
+    "bad_examples": [
+      "所有肤质绝不过敏",
+      "任何敏感肌均可放心使用"
+    ],
+    "rewrite_hint": "说明已有的适用肤质，保留局部测试和不适停用提醒。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_attr_003",
+    "category": "美妆",
+    "issue_type": "使用方式不明确",
+    "risk_level": "medium",
+    "rule_text": "使用方式应说明基本操作，随意使用、想怎么用就怎么用等占位语不能指导正确使用。",
+    "bad_examples": [
+      "使用方式：随意使用",
+      "使用方式：想怎么用就怎么用"
+    ],
+    "rewrite_hint": "按说明书补充用量、部位和频率；缺乏依据时提示待补充。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_attr_004",
+    "category": "美妆",
+    "issue_type": "注意事项不明确",
+    "risk_level": "medium",
+    "rule_text": "注意事项不能以无需注意、无任何禁忌等安全保证替代，应提供标签中的实际限制。",
+    "bad_examples": [
+      "注意事项：无需注意",
+      "注意事项：无任何禁忌"
+    ],
+    "rewrite_hint": "按产品说明补充真实的使用限制和不适处理方式。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "beauty_claim_004",
+    "category": "美妆",
+    "issue_type": "成分功效推断",
+    "risk_level": "high",
+    "rule_text": "不得仅因含有某成分就推断成品必然具有治疗、永久修复或其他未经证实的效果。",
+    "bad_examples": [
+      "含积雪草，所以一定能根治皮炎"
+    ],
+    "rewrite_hint": "区分成分事实与成品功效，只保留已提供的成分表。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_attr_001",
+    "category": "3C",
+    "issue_type": "关键信息缺失",
+    "risk_level": "medium",
+    "rule_text": "3C商品应说明品牌、型号、规格、兼容性和保修期限；字段缺失可汇总为关键信息缺失。",
+    "bad_examples": [
+      "型号为空",
+      "兼容性为空",
+      "保修为空"
+    ],
+    "rewrite_hint": "补充准确型号、规格、协议和保修期限。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_claim_001",
+    "category": "3C",
+    "issue_type": "过度承诺",
+    "risk_level": "high",
+    "rule_text": "3C商品不得承诺永久有效、兼容所有设备或永不损坏；引用并否定这些说法的兼容性提醒应排除。",
+    "bad_examples": [
+      "永久保修",
+      "兼容所有设备",
+      "永不断线"
+    ],
+    "rewrite_hint": "写明输入已有的适用型号、使用条件和有限保修范围。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_attr_002",
+    "category": "3C",
+    "issue_type": "兼容性说明缺失",
+    "risk_level": "medium",
+    "rule_text": "应给出支持的接口、协议、系统或型号；空值、都可以等表述不能替代具体兼容性说明。该标签与关键信息缺失粒度不同，评测不自动合并。",
+    "bad_examples": [
+      "兼容性为空",
+      "兼容性：都可以"
+    ],
+    "rewrite_hint": "依据参数表填写支持的协议或型号，避免宣称全兼容。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_attr_003",
+    "category": "3C",
+    "issue_type": "保修信息缺失",
+    "risk_level": "medium",
+    "rule_text": "应说明实际保修期限及必要范围；空值、见客服等无法确定期限的表述应补充。该标签与关键信息缺失粒度不同，评测不自动合并。",
+    "bad_examples": [
+      "保修为空",
+      "保修：见客服"
+    ],
+    "rewrite_hint": "填写商家确认的保修期限和范围，不新增永久保修承诺。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_attr_004",
+    "category": "3C",
+    "issue_type": "规格信息不明确",
+    "risk_level": "medium",
+    "rule_text": "规格字段应说明核心参数，标准版、参数见图等占位语无法替代可读取的具体规格。",
+    "bad_examples": [
+      "规格：参数见图",
+      "规格：标准版"
+    ],
+    "rewrite_hint": "从规格表补充实际容量、功率、尺寸或协议版本。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_claim_002",
+    "category": "3C",
+    "issue_type": "误导性功效",
+    "risk_level": "high",
+    "rule_text": "普通电子产品不得将护眼、舒适等性能夸大为消除视力疲劳或治疗疾病的保证。",
+    "bad_examples": [
+      "100%消除视力疲劳",
+      "用了就能恢复视力"
+    ],
+    "rewrite_hint": "保留真实显示参数及使用条件，删除未经证实的健康效果。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_claim_003",
+    "category": "3C",
+    "issue_type": "夸大宣传",
+    "risk_level": "high",
+    "rule_text": "不得承诺所有户型、任何距离或任何网络环境下性能均不受影响。",
+    "bad_examples": [
+      "覆盖所有户型",
+      "任何距离都满速"
+    ],
+    "rewrite_hint": "写明输入已有的无线标准、规格及已知使用条件。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "3c_consistency_001",
+    "category": "3C",
+    "issue_type": "属性与文案冲突",
+    "risk_level": "medium",
+    "rule_text": "3C商品标题与描述声明的型号、容量、功率等应与结构化规格一致，单位等价换算不应视为冲突。",
+    "bad_examples": [
+      "属性型号为C65，描述型号：C100"
+    ],
+    "rewrite_hint": "核实真实型号后统一文案和属性，不自行选择看似更高的规格。",
+    "version": "1.1",
+    "status": "enabled"
+  },
+  {
+    "rule_id": "general_medical_001",
+    "category": "通用",
+    "issue_type": "医疗功效宣称",
+    "risk_level": "high",
+    "rule_text": "普通商品不得宣称治疗或根治疾病。应结合上下文排除明确否定医疗作用的警示；类目已有同义问题时不应重复累计相同证据。",
+    "bad_examples": [
+      "电子设备可治疗失眠",
+      "普通商品根治慢性病"
+    ],
+    "rewrite_hint": "删除医疗效果承诺，仅保留输入已有的商品属性和使用方式。",
+    "version": "1.1",
+    "status": "enabled"
+  }
+]

@@ -1,0 +1,119 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-quality_agent}
+      MYSQL_USER: ${MYSQL_USER:-quality_agent}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quality_agent}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me}
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' > /dev/null"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  api:
+    build: .
+    volumes:
+      - evaluation_reports:/app/evaluator/reports
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-quality_agent}:${MYSQL_PASSWORD:-quality_agent}@mysql:3306/${MYSQL_DATABASE:-quality_agent}?charset=utf8mb4
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-quality_rules}
+      ELASTICSEARCH_TIMEOUT_SECONDS: ${ELASTICSEARCH_TIMEOUT_SECONDS:-2}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-20}
+      DEEPSEEK_MAX_RETRIES: ${DEEPSEEK_MAX_RETRIES:-1}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+      ADMIN_SESSION_HOURS: ${ADMIN_SESSION_HOURS:-8}
+      ADMIN_COOKIE_SECURE: ${ADMIN_COOKIE_SECURE:-false}
+      APP_ENV: ${APP_ENV:-local}
+      APP_MAX_BODY_BYTES: ${APP_MAX_BODY_BYTES:-262144}
+      ADMIN_THROTTLE_FILE: /tmp/quality-agent-auth-throttle.json
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; d=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health')); raise SystemExit(0 if d.get('elasticsearch') == 'available' else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+
+  worker:
+    build: .
+    command: ["python", "-m", "scripts.worker"]
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-quality_agent}:${MYSQL_PASSWORD:-quality_agent}@mysql:3306/${MYSQL_DATABASE:-quality_agent}?charset=utf8mb4
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_INDEX: ${ELASTICSEARCH_INDEX:-quality_rules}
+      ELASTICSEARCH_TIMEOUT_SECONDS: ${ELASTICSEARCH_TIMEOUT_SECONDS:-2}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-20}
+      DEEPSEEK_MAX_RETRIES: ${DEEPSEEK_MAX_RETRIES:-1}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+
+volumes:
+  mysql_data:
+  es_data:
+  evaluation_reports:

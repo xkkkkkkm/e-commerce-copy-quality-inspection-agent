@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#183e38">
+    <meta name="description" content="商品文案质检与优化工作台，检查风险表达、商品信息与规则依据。">
+    <title data-i18n="文案质检 · 商品内容工作台">文案质检 · 商品内容工作台</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%23183e38'/%3E%3Cpath d='m13 25 7 7 15-17' stroke='%23fff' stroke-width='4' fill='none'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/styles.css?v=20260911-2">
+    <link rel="stylesheet" href="/static/i18n.css?v=20260911-1">
+    <link rel="stylesheet" href="/static/controls.css?v=20260911-3">
+    <script src="/static/i18n.js?v=20260911-3" defer></script>
+    <script src="/static/workbench-messages.js?v=20260911-1" defer></script>
+    <script src="/static/app.js?v=20260911-3" defer></script>
+    <script src="/static/select-controls.js?v=20260911-3" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace"><span data-i18n="跳转到质检工作台">跳转到质检工作台</span></a>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="文案质检首页" data-i18n-aria-label="文案质检首页"><span class="brand-icon" aria-hidden="true">✓</span><span><span data-i18n="文案质检">文案质检</span><span class="brand-sub"><span data-i18n="商品内容工作台">商品内容工作台</span></span></span></a>
+      <nav aria-label="主导航" data-i18n-aria-label="主导航"><a href="/admin"><span data-i18n="管理后台">管理后台</span></a><a href="#workspace"><span data-i18n="商品质检">商品质检</span></a><a href="#evaluation"><span data-i18n="效果评测">效果评测</span></a><a class="docs-link" href="/docs" target="_blank" rel="noopener"><span data-i18n="API 文档">API 文档</span> <span aria-hidden="true">↗</span></a><label class="language-control locale-control"><span class="sr-only" data-i18n="界面语言">界面语言</span><select data-language-switch aria-label="界面语言" data-i18n-aria-label="界面语言"><option value="zh-CN" lang="zh-CN">中文</option><option value="en" lang="en">English</option></select></label></nav>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div><p class="eyebrow"><span aria-hidden="true"></span> CONTENT QUALITY AGENT</p><h1 id="page-title"><span data-i18n="好文案，从每一处准确开始。">好文案，从每一处准确开始。</span></h1><p class="intro-copy"><span data-i18n="发现风险表达，核对商品信息，让优化有据可循。">发现风险表达，核对商品信息，让优化有据可循。</span></p><p class="language-note" data-i18n="支持中英文界面，质检面向中文商品文案；原文、证据与优化文案保留中文。">支持中英文界面，质检面向中文商品文案；原文、证据与优化文案保留中文。</p></div>
+        <div class="scope-note"><span class="scope-caption"><span data-i18n="当前支持">当前支持</span></span><div><span><span data-i18n="食品">食品</span></span><span><span data-i18n="美妆">美妆</span></span><span><span data-i18n="3C 数码">3C 数码</span></span></div></div>
+      </section>
+
+      <section class="samples-section" aria-label="体验样例" data-i18n-aria-label="体验样例">
+        <div class="section-kicker"><span data-i18n="从一个例子开始">从一个例子开始</span><span><span data-i18n="选择样例后，点击「开始质检」">选择样例后，点击「开始质检」</span></span></div>
+        <div class="sample-grid">
+          <button class="sample-card" type="button" data-sample="high"><span class="sample-icon food" aria-hidden="true"><span data-i18n="茶">茶</span></span><span class="sample-copy"><strong><span data-i18n="食品 · 草本花茶">食品 · 草本花茶</span></strong><span><span data-i18n="医疗功效与绝对化承诺">医疗功效与绝对化承诺</span></span></span><span class="risk-tag high"><span data-i18n="高风险样例">高风险样例</span></span><span class="sample-arrow" aria-hidden="true">↗</span></button>
+          <button class="sample-card" type="button" data-sample="medium"><span class="sample-icon beauty" aria-hidden="true"><span data-i18n="妆">妆</span></span><span class="sample-copy"><strong><span data-i18n="美妆 · 保湿面膜">美妆 · 保湿面膜</span></strong><span><span data-i18n="关键商品属性缺失">关键商品属性缺失</span></span></span><span class="risk-tag medium"><span data-i18n="中风险样例">中风险样例</span></span><span class="sample-arrow" aria-hidden="true">↗</span></button>
+          <button class="sample-card" type="button" data-sample="pass"><span class="sample-icon tech" aria-hidden="true">C</span><span class="sample-copy"><strong><span data-i18n="3C · 便携充电器">3C · 便携充电器</span></strong><span><span data-i18n="信息完整，客观描述">信息完整，客观描述</span></span></span><span class="risk-tag pass"><span data-i18n="通过样例">通过样例</span></span><span class="sample-arrow" aria-hidden="true">↗</span></button>
+        </div>
+        <p class="sample-note"><span data-i18n="样例标签对应规则模式的预期结果；完整模式可能识别出额外问题。">样例标签对应规则模式的预期结果；完整模式可能识别出额外问题。</span></p>
+      </section>
+
+      <section id="workspace" class="workspace" aria-label="商品质检工作台" data-i18n-aria-label="商品质检工作台">
+        <article class="panel input-panel">
+          <div class="panel-heading"><div><p class="step-label"><span data-i18n="01 / 商品输入">01 / 商品输入</span></p><h2><span data-i18n="告诉我们商品信息">告诉我们商品信息</span></h2></div><button id="reset-form" class="text-button" type="button"><span data-i18n="重置">重置</span></button></div>
+          <form id="product-form">
+            <div class="form-row"><label><span data-i18n="商品 ID">商品 ID</span> <input id="product-id" name="product_id" maxlength="128" required autocomplete="off" placeholder="例如 demo_food_001" data-i18n-placeholder="例如 demo_food_001"></label><label><span data-i18n="商品类目">商品类目</span> <select id="category" name="category"><option value="" data-i18n="自动识别">自动识别</option><option value="食品" data-i18n="食品">食品</option><option value="美妆" data-i18n="美妆">美妆</option><option value="3C" data-i18n="3C 数码">3C 数码</option></select></label></div>
+            <label class="field-label" for="product-title"><span data-i18n="商品标题">商品标题</span> <span id="title-counter" class="field-meta">0 / 500</span></label>
+            <textarea id="product-title" name="title" rows="2" maxlength="500" required placeholder="输入完整商品标题" data-i18n-placeholder="输入完整商品标题"></textarea>
+            <label class="field-label" for="description"><span data-i18n="商品描述">商品描述</span> <span class="field-meta"><span data-i18n="可选">可选</span></span></label>
+            <textarea id="description" name="description" rows="4" maxlength="20000" placeholder="填写商品卖点、适用范围及详情文案" data-i18n-placeholder="填写商品卖点、适用范围及详情文案"></textarea>
+            <div class="field-label"><label for="attributes"><span data-i18n="商品属性">商品属性</span></label><button id="format-json" class="text-button small" type="button"><span data-i18n="格式化 JSON">格式化 JSON</span></button></div>
+            <textarea id="attributes" name="attributes" class="code-input" rows="8" spellcheck="false" aria-describedby="attributes-help" placeholder='{"brand": "品牌名称"}' data-i18n-placeholder="{&quot;brand&quot;: &quot;品牌名称&quot;}">{}</textarea>
+            <p id="attributes-help" class="field-help"><span data-i18n="使用 JSON 对象填写真实属性，如品牌、规格、成分等。">使用 JSON 对象填写真实属性，如品牌、规格、成分等。</span></p>
+            <fieldset class="mode-picker"><legend><span data-i18n="质检方式">质检方式</span></legend><label><input type="radio" name="mode" value="rules" checked><span><strong><span data-i18n="规则模式">规则模式</span></strong><small><span data-i18n="快速检查明确风险与信息完整性">快速检查明确风险与信息完整性</span></small></span><span class="mode-pill"><span data-i18n="快速体验">快速体验</span></span></label><label><input type="radio" name="mode" value="full"><span><strong><span data-i18n="完整模式">完整模式</span></strong><small><span data-i18n="结合规则依据与语义分析，优化文案">结合规则依据与语义分析，优化文案</span></small></span></label></fieldset>
+            <div id="form-error" class="notice error" role="alert" hidden></div>
+            <button id="inspect-button" class="primary-button" type="submit"><span id="inspect-button-label">开始质检</span><span aria-hidden="true">↗</span></button>
+            <p class="submit-note"><span data-i18n="结果用于辅助审核，请结合实际商品信息确认。">结果用于辅助审核，请结合实际商品信息确认。</span></p>
+          </form>
+        </article>
+
+        <article class="panel report-panel" aria-labelledby="report-heading" aria-busy="false">
+          <div class="panel-heading"><div><p class="step-label"><span data-i18n="02 / 质检报告">02 / 质检报告</span></p><h2 id="report-heading"><span data-i18n="让每个修改都有依据">让每个修改都有依据</span></h2></div><button id="download-report" class="secondary-button compact" type="button" disabled><span data-i18n="下载 JSON">下载 JSON</span> <span aria-hidden="true">↓</span></button></div>
+          <div id="empty-state" class="empty-state"><div class="document-art" aria-hidden="true"><div class="art-badge">✓</div><span></span><span></span><span></span><i></i><i></i></div><h3><span data-i18n="准备好，一起检查这份文案">准备好，一起检查这份文案</span></h3><p><span data-i18n="选择一个样例或填写商品信息，">选择一个样例或填写商品信息，</span><br><span data-i18n="查看风险、规则依据与可参考的优化文案。">查看风险、规则依据与可参考的优化文案。</span></p><div class="empty-steps"><span><span data-i18n="识别问题">识别问题</span></span><b>→</b><span><span data-i18n="引用规则">引用规则</span></span><b>→</b><span><span data-i18n="优化表达">优化表达</span></span></div></div>
+          <div id="loading-state" class="empty-state" role="status" hidden><span class="spinner" aria-hidden="true"></span><h3><span data-i18n="正在检查商品文案">正在检查商品文案</span></h3><p id="loading-note">正在核对表达、属性与规则依据…</p></div>
+          <div id="report-content" hidden>
+            <div id="stale-notice" class="notice info" hidden><span data-i18n="输入已修改，当前报告对应上一次提交。重新质检可更新结果。">输入已修改，当前报告对应上一次提交。重新质检可更新结果。</span></div>
+            <div id="report-banner" class="report-banner"><div><span class="result-caption"><span data-i18n="质检结论">质检结论</span></span><h3 id="risk-label"></h3><p id="report-summary"></p></div><div class="score-block"><strong id="risk-score"></strong><span id="risk-score-caption">风险分 · 越低越好</span></div></div>
+            <div class="report-meta"><span id="report-category"></span><span id="report-mode"></span><span id="report-issue-count"></span></div>
+            <div id="report-warnings" class="notice warning" hidden></div>
+            <div class="tabs" role="tablist" aria-label="报告详情" data-i18n-aria-label="报告详情"><button class="tab active" type="button" role="tab" id="tab-issues" aria-selected="true" aria-controls="panel-issues" data-tab="issues"><span class="tab-label" data-i18n="发现的问题">发现的问题</span> <span id="issue-count">0</span></button><button class="tab" type="button" role="tab" id="tab-rewrite" aria-selected="false" aria-controls="panel-rewrite" tabindex="-1" data-tab="rewrite"><span data-i18n="优化文案">优化文案</span></button><button class="tab" type="button" role="tab" id="tab-rules" aria-selected="false" aria-controls="panel-rules" tabindex="-1" data-tab="rules"><span data-i18n="规则依据">规则依据</span></button></div>
+            <section id="panel-issues" role="tabpanel" aria-labelledby="tab-issues" tabindex="0"><div id="issues-list" class="detail-list"></div></section>
+            <section id="panel-rewrite" role="tabpanel" aria-labelledby="tab-rewrite" tabindex="0" hidden><div class="rewrite-heading"><h3><span data-i18n="参考优化文案">参考优化文案</span></h3><button id="copy-rewrite" class="text-button" type="button"><span data-i18n="复制文案">复制文案</span></button></div><p class="field-help"><span data-i18n="发布前请核实属性、规格与所有事实性表述。">发布前请核实属性、规格与所有事实性表述。</span></p><div class="rewrite-block"><span><span data-i18n="商品标题">商品标题</span></span><p id="optimized-title"></p></div><div class="rewrite-block"><span><span data-i18n="商品描述">商品描述</span></span><p id="optimized-description"></p></div><div class="rewrite-reason"><h4><span data-i18n="为什么这样改">为什么这样改</span></h4><p id="rewrite-reason"></p></div></section>
+            <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules" tabindex="0" hidden><p class="tab-description"><span data-i18n="查看本次质检引用或检索到的规则，辅助核对判断依据。">查看本次质检引用或检索到的规则，辅助核对判断依据。</span></p><div id="rules-list" class="detail-list"></div></section>
+            <details id="trace-details" class="trace-details"><summary><span><span data-i18n="查看执行过程">查看执行过程</span> <span class="trace-caption">Trace</span></span><span id="trace-count" class="trace-count">按需加载</span></summary><div class="trace-topline"><p><span data-i18n="逐步查看本次质检的输入、输出与耗时。">逐步查看本次质检的输入、输出与耗时。</span></p><button id="reload-traces" class="text-button" type="button"><span data-i18n="刷新">刷新</span></button></div><div id="trace-error" class="notice error" role="alert" hidden></div><ol id="traces-list" class="timeline"></ol></details>
+            <p class="task-meta"><span data-i18n="任务 ID">任务 ID</span> <span id="task-id"></span></p>
+          </div>
+        </article>
+      </section>
+
+      <section id="evaluation" class="panel evaluation-panel" aria-labelledby="evaluation-heading">
+        <div class="evaluation-intro"><div><p class="step-label"><span data-i18n="03 / 效果评测">03 / 效果评测</span></p><h2 id="evaluation-heading"><span data-i18n="用标注样例，检验质检表现">用标注样例，检验质检表现</span></h2><p><span data-i18n="覆盖食品、美妆和 3C 类目。内置合成样例用于演示，需经业务复核后评估实际效果。">覆盖食品、美妆和 3C 类目。内置合成样例用于演示，需经业务复核后评估实际效果。</span></p></div><div class="evaluation-controls"><button id="load-latest-evaluation" class="text-button" type="button">查看最近结果</button><label class="sr-only" for="evaluation-mode"><span data-i18n="评测模式">评测模式</span></label><select id="evaluation-mode"><option value="rules" data-i18n="规则模式">规则模式</option><option value="full" data-i18n="完整模式">完整模式</option></select><button id="run-evaluation" class="primary-button" type="button">运行评测 <span aria-hidden="true">↗</span></button></div></div>
+        <p class="evaluation-access-note"><span data-i18n="运行评测需要管理员登录。">运行评测需要管理员登录。</span> <a href="/admin" target="_blank" rel="noopener" data-i18n="打开管理后台登录">打开管理后台登录</a><span data-i18n="，登录后返回本页运行。">，登录后返回本页运行。</span></p>
+        <div id="evaluation-error" class="notice error" role="alert" hidden></div>
+        <p id="evaluation-status" class="evaluation-status" role="status">运行后显示整体指标、分品类结果和逐条明细。</p>
+        <div id="evaluation-results" hidden><p id="evaluation-model-note" class="notice info" hidden></p><div id="evaluation-metrics" class="metric-grid"></div><div class="evaluation-tables"><div><h3><span data-i18n="分品类表现">分品类表现</span></h3><div class="table-scroll"><table><thead><tr><th scope="col"><span data-i18n="类目">类目</span></th><th scope="col"><span data-i18n="样例数">样例数</span></th><th scope="col"><span data-i18n="风险等级准确率">风险等级准确率</span></th><th scope="col"><span data-i18n="问题召回率">问题召回率</span></th></tr></thead><tbody id="category-results"></tbody></table></div></div><div class="evaluation-detail-heading"><h3><span data-i18n="样例明细">样例明细</span></h3><button id="download-evaluation" class="text-button" type="button"><span data-i18n="下载评测 JSON ↓">下载评测 JSON ↓</span></button></div><div class="table-scroll case-scroll"><table class="case-table"><thead><tr><th scope="col"><span data-i18n="商品 / 类目">商品 / 类目</span></th><th scope="col"><span data-i18n="预期风险">预期风险</span></th><th scope="col"><span data-i18n="实际风险">实际风险</span></th><th scope="col"><span data-i18n="结果">结果</span></th><th scope="col"><span data-i18n="问题详情">问题详情</span></th></tr></thead><tbody id="case-results"></tbody></table></div></div><p id="evaluation-run-info" class="task-meta"></p></div>
+      </section>
+      <footer class="site-footer"><span><span data-i18n="文案质检 · 让商品信息更清晰可信">文案质检 · 让商品信息更清晰可信</span></span><span><span data-i18n="食品 / 美妆 / 3C">食品 / 美妆 / 3C</span></span></footer>
+    </main>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

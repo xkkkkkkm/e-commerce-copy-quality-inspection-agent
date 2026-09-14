@@ -1,0 +1,10 @@
+{
+  "name": "product-copy-quality-agent-ui",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/test_i18n.cjs tests/test_select_controls.cjs tests/test_batch_publication.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

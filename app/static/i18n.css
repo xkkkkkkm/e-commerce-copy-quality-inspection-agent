@@ -1,0 +1,8 @@
+.language-switch { display: inline-flex; align-items: center; gap: .5rem; flex-shrink: 0; font: inherit; }
+.language-switch select, select[data-language-switch] { min-width: 112px; height: 36px; padding: 4px 26px 4px 10px; border: 1px solid #c8d7d0; border-radius: 8px; color: #183e38; background: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.language-switch select:focus-visible, select[data-language-switch]:focus-visible { outline: 3px solid #5fa391; outline-offset: 2px; }
+html[lang="en"] .button { white-space: normal; }
+html[lang="en"] .topbar-right { gap: 12px; }
+html[lang="en"] .status-tabs { overflow-x: auto; }
+.language-note { color: #52665d; font-size: 12px; line-height: 1.6; }
+@media (max-width: 600px) { .language-switch select, select[data-language-switch] { min-width: 96px; font-size: 12px; } }
