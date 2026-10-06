@@ -22,6 +22,7 @@ from db.migrations import run_migrations
 from rag import RuleRetriever
 from app.admin import router as admin_router
 from app.simulation import router as simulation_router
+from app.merchant import router as merchant_router
 from app.admin_auth import require_admin, router as admin_auth_router
 from db import auth_models, catalog_models  # noqa: F401: register new tables
 from db import job_models  # noqa: F401: register durable inspection queue tables
@@ -95,11 +96,17 @@ app.mount("/static", StaticFiles(directory=ROOT / "app/static"), name="static")
 app.include_router(admin_auth_router)
 app.include_router(admin_router)
 app.include_router(simulation_router)
+app.include_router(merchant_router)
 
 
 @app.get("/admin", include_in_schema=False)
 def admin_page():
     return FileResponse(ROOT / "app/static/admin.html")
+
+
+@app.get("/merchant", include_in_schema=False)
+def merchant_page():
+    return FileResponse(ROOT / "app/static/merchant.html")
 
 
 @app.get("/", include_in_schema=False)

@@ -18,6 +18,8 @@ docker compose up --build -d --wait
 
 打开 http://127.0.0.1:8000/admin 。默认演示租户 `default`，账号 `admin`，密码 `admin12345`。登录后可使用首页质检工作台。MySQL 宿主机端口 3307、容器端口 3306；Redis 宿主机端口 6380、容器端口 6379。
 
+商家端位于 http://127.0.0.1:8000/merchant。管理员登录后可调用 `POST /api/merchant/invite` 邀请商家账号；商家登录后可上传 CSV/JSON（最多 1000 条、10 MB），商品会归属该商家并进入待审核状态。管理员也可使用 `POST /api/admin/products/import` 上传 CSV，字段为 `product_id,merchant_name,category,title,description`。
+
 在本地忽略的 `.env` 中配置 DeepSeek 密钥和可用模型名称。完整模式默认执行 LLM 语义审核，再合并不可被模型否决的规则检查。无密钥或模型异常时输出降级报告，不能作为完整模式的发布依据。显式规则模式用于离线基线与低成本负载验证。
 
 ## 本次工程能力

@@ -2,7 +2,9 @@
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import csv
+import io
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 
@@ -74,6 +76,30 @@ def products(q: str | None = Query(default=None, max_length=200),
 @router.post("/products", status_code=201)
 def create(data: ProductCreate, actor: str = Depends(require_admin), db: Session = Depends(get_db)):
     return call(catalog.create_product, db, data, actor)
+
+
+@router.post("/products/import", status_code=202)
+async def import_products(file: UploadFile = File(...), actor: str = Depends(require_admin), db: Session = Depends(get_db)):
+    """Import a bounded CSV catalog; each row is committed independently for clear errors."""
+    raw = await file.read()
+    if len(raw) > 10 * 1024 * 1024:
+        raise HTTPException(413, "导入文件不能超过 10 MB")
+    try:
+        rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))))
+        if not rows or len(rows) > 1000:
+            raise ValueError("文件必须包含 1-1000 条商品")
+    except Exception as exc:
+        raise HTTPException(422, f"CSV 文件无效: {exc}") from exc
+    results = []
+    for index, row in enumerate(rows, 1):
+        try:
+            data = ProductCreate.model_validate({**row, "attributes": {}})
+            product = catalog.create_product(db, data, actor)
+            results.append({"row": index, "ok": True, "product_id": product["product_id"]})
+        except Exception as exc:
+            db.rollback()
+            results.append({"row": index, "ok": False, "error": str(exc)})
+    return {"total": len(rows), "created": sum(x["ok"] for x in results), "failed": sum(not x["ok"] for x in results), "items": results}
 
 
 @router.post("/products/batch-inspect")
