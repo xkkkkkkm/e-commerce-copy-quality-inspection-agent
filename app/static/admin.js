@@ -885,6 +885,20 @@
     });
   }
   $("simulate-products").addEventListener("click", () => showDialog("simulation-dialog"));
+  $("import-products").addEventListener("click", () => { $("import-form").reset(); $("import-file-name").textContent = text(t("尚未选择文件")); $("import-error").hidden = true; $("import-result").hidden = true; showDialog("import-dialog"); });
+  $("import-file").addEventListener("change", () => { const file = $("import-file").files[0]; $("import-file-name").textContent = file ? file.name : text(t("尚未选择文件")); });
+  $("import-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const file = $("import-file").files[0]; if (!file) return;
+    const submit = $("import-submit"); submit.disabled = true; $("import-error").hidden = true; $("import-result").hidden = true;
+    try {
+      const form = new FormData(); form.append("file", file);
+      const response = await fetch("/api/admin/products/import", { method: "POST", body: form, credentials: "same-origin", headers: state.csrf ? { "X-CSRF-Token": state.csrf } : {} });
+      const body = await response.json(); if (!response.ok) throw new Error(responseError(body, response.status));
+      $("import-result").textContent = text(t("导入完成：成功 {p0} 条，失败 {p1} 条。", { p0: body.created || 0, p1: body.failed || 0 })); $("import-result").hidden = false;
+      state.page = 1; await refresh();
+    } catch (error) { setError("import-error", error.message); } finally { submit.disabled = false; }
+  });
   $("simulation-form").addEventListener("submit", previewSimulation);
   $("simulation-deliver-button").addEventListener("click", deliverSimulation);
   $("simulation-options").addEventListener("input", (event) => {
